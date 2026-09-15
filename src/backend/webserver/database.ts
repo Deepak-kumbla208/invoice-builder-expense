@@ -1,13 +1,15 @@
-import fs from 'fs';
 import path from 'path';
-import { initInitialData, initSchema, openPostgreSql, openSqlLite } from '../shared/db/setup';
+import { runSqlMigrations } from '../shared/db/migrationRunner';
+import { openPostgreSql } from '../shared/db/setup';
 import { DatabaseType } from '../shared/enums/databaseType';
 import type { DatabaseAdapter } from '../shared/types/DatabaseAdapter';
 import type { PostgresConfig } from '../shared/types/postgresConfig';
 import type { SqLiteConfig } from '../shared/types/sqliteConfig';
-import { runMigrations } from './migration';
 
 export let dbInstance: DatabaseAdapter | null = null;
+
+const migrationsPath =
+  process.env.MIGRATIONS_PATH || path.resolve(process.cwd(), 'src', 'backend', 'shared', 'migrations');
 
 export const setupDB = async (opts: {
   dbType: DatabaseType;
@@ -15,32 +17,16 @@ export const setupDB = async (opts: {
   postgresConfig?: PostgresConfig;
   sqliteConfig?: SqLiteConfig;
 }): Promise<void> => {
-  const { sqliteConfig, createIfMissing = true, dbType, postgresConfig } = opts;
+  const { dbType, postgresConfig } = opts;
 
   if (dbInstance) {
     await (dbInstance as DatabaseAdapter).close();
     dbInstance = null;
   }
 
-  if (dbType === DatabaseType.postgre) {
-    if (!postgresConfig) throw new Error('error.postgresConfig');
-    const { db: newDb } = await openPostgreSql(postgresConfig);
-    dbInstance = newDb;
-  } else if (dbType === DatabaseType.sqlite) {
-    if (sqliteConfig?.fullPath) fs.mkdirSync(path.dirname(sqliteConfig?.fullPath), { recursive: true });
-    const { db: newDb } = await openSqlLite({ fullPath: sqliteConfig?.fullPath, createIfMissing: createIfMissing });
-    dbInstance = newDb;
-  }
+  if (dbType !== DatabaseType.postgre || !postgresConfig) throw new Error('error.postgresConfig');
 
-  if (!dbInstance) throw new Error('error.noDatabase');
-
-  if (createIfMissing) {
-    await initSchema(dbInstance);
-    await initInitialData(dbInstance);
-  }
-
-  const migrationResult = await runMigrations(dbInstance);
-  if (migrationResult && !migrationResult.success) {
-    throw new Error(migrationResult.message ?? 'error.failedMigration');
-  }
+  const { db: newDb, connectionString } = await openPostgreSql(postgresConfig);
+  await runSqlMigrations(connectionString, migrationsPath);
+  dbInstance = newDb;
 };

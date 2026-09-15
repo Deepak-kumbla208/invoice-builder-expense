@@ -1,17 +1,16 @@
 // @vitest-environment node
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { up as seedLayouts } from '../shared/migrations/20260902-28-layout-schema-seeds';
 import type { DatabaseAdapter } from '../shared/types/DatabaseAdapter';
 import { createPgTestDb, type PgTestDb } from './helpers/pgTestDb';
 
 type LayoutRow = { id: number; schema: string; isArchived: number | boolean };
 
-describe('layout schema migrations', () => {
+describe('baseline layout seeds', () => {
   let testDb: PgTestDb;
   let db: DatabaseAdapter;
 
   beforeAll(async () => {
-    testDb = await createPgTestDb({ stopBefore: '20260902-28' });
+    testDb = await createPgTestDb();
     db = testDb.db;
   });
 
@@ -19,10 +18,7 @@ describe('layout schema migrations', () => {
     await testDb.drop();
   });
 
-  it('creates schema storage and seeds active and archived built-in layouts idempotently', async () => {
-    expect((await seedLayouts(db))?.success).not.toBe(false);
-    expect((await seedLayouts(db))?.success).not.toBe(false);
-
+  it('seeds active and archived built-in layouts', async () => {
     const layouts = await db.all<LayoutRow>('SELECT "id", "schema", "isArchived" FROM layouts ORDER BY "id"');
     const names = layouts.map(layout => JSON.parse(layout.schema).meta.name);
 
