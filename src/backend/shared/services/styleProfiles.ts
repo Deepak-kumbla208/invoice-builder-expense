@@ -1,4 +1,4 @@
-import type { DatabaseAdapter } from '../types/DatabaseAdapter';
+import type { Db } from '../db/tx';
 import type { EntityWithCounts } from '../types/entityWithCounts';
 import type { FilterData } from '../types/invoiceFilter';
 import type { Response } from '../types/response';
@@ -34,7 +34,7 @@ const styleProfileFields: (keyof StyleProfile)[] = [
 ];
 
 export const getAllStyleProfiles = async (
-  db: DatabaseAdapter,
+  db: Db,
   filter?: FilterData[]
 ): Promise<Response<(StyleProfile & EntityWithCounts)[]>> => {
   const getAll = getAllEntities<StyleProfile>(db, 'style_profiles', 't', 'i', {
@@ -72,7 +72,7 @@ export const getAllStyleProfiles = async (
 };
 
 export const addStyleProfile = async (
-  db: DatabaseAdapter,
+  db: Db,
   data: StyleProfile
 ): Promise<Response<StyleProfile & EntityWithCounts>> => {
   const handle = handleEntity<StyleProfile>(db, 'style_profiles', 'sp', styleProfileFields, {
@@ -108,7 +108,7 @@ export const addStyleProfile = async (
 };
 
 export const updateStyleProfile = async (
-  db: DatabaseAdapter,
+  db: Db,
   data: StyleProfile
 ): Promise<Response<StyleProfile & EntityWithCounts>> => {
   const handle = handleEntity<StyleProfile>(db, 'style_profiles', 'sp', styleProfileFields, {
@@ -146,16 +146,16 @@ export const updateStyleProfile = async (
   return result;
 };
 
-export const deleteStyleProfile = async (db: DatabaseAdapter, id: number) => {
+export const deleteStyleProfile = async (db: Db, id: number) => {
   try {
     await db.run('DELETE FROM style_profiles WHERE "id" = ?;', [id]);
     return { success: true };
   } catch (error) {
-    return { success: false, ...mapDatabaseError(error, db.type) };
+    return { success: false, ...mapDatabaseError(error) };
   }
 };
 
-export const batchAddStyleProfile = async (db: DatabaseAdapter, data: StyleProfile[]) => {
+export const batchAddStyleProfile = async (db: Db, data: StyleProfile[]) => {
   const handle = handleEntity<StyleProfile>(db, 'style_profiles', 'sp', styleProfileFields, {
     joins: `LEFT JOIN invoices i ON i."styleProfilesId" = sp."id"`,
     invoiceCountExpr: `
@@ -168,7 +168,6 @@ export const batchAddStyleProfile = async (db: DatabaseAdapter, data: StyleProfi
         `
   });
   try {
-    await db.run('BEGIN');
     for (const row of data) {
       const result = await handle({
         ...row,
@@ -177,22 +176,11 @@ export const batchAddStyleProfile = async (db: DatabaseAdapter, data: StyleProfi
         pdfTexts: typeof row.pdfTexts === 'string' ? row.pdfTexts : JSON.stringify(row.pdfTexts)
       });
       if (!result.success) {
-        try {
-          await db.run('ROLLBACK');
-        } catch {
-          throw new Error(`error.rollbackFailed`);
-        }
         return result;
       }
     }
-    await db.run('COMMIT');
     return { success: true };
   } catch (error) {
-    try {
-      await db.run('ROLLBACK');
-    } catch {
-      throw new Error(`error.rollbackFailed`);
-    }
-    return { success: false, ...mapDatabaseError(error, db.type) };
+    return { success: false, ...mapDatabaseError(error) };
   }
 };

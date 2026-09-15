@@ -1,8 +1,8 @@
 import type { Item } from '../../shared/types/item';
-import type { DatabaseAdapter } from '../types/DatabaseAdapter';
+import type { Db } from '../db/tx';
 
 export const getOrCreateByName = async (
-  db: DatabaseAdapter,
+  db: Db,
   table: 'units' | 'categories',
   name: string
 ): Promise<number | undefined> => {
@@ -17,7 +17,7 @@ export const getOrCreateByName = async (
   return undefined;
 };
 
-export const resolveItemRelations = async (db: DatabaseAdapter, data: Item): Promise<Item> => {
+export const resolveItemRelations = async (db: Db, data: Item): Promise<Item> => {
   const item = { ...data };
 
   if (typeof item.categoryId === 'undefined' && item.categoryName) {

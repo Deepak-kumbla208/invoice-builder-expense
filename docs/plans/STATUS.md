@@ -26,13 +26,17 @@
 ## Current
 
 - **Active phase:** 0
-- **Next task:** 0.3 PostgreSQL-only database layer with request transactions
+- **Next task:** 0.4 Server wiring (CORS/body limits/helmet/error handler/`migrate.ts`; controllers' `withTx` wiring is already done, pulled forward in 0.3)
 - **Blockers:** none
 
 ## Session log
 
 <!-- newest first, ≤10 lines per session: date · tasks done · checks run/results · next · blockers -->
 
+- 2026-09-15 · 0.3 done: `db/pool.ts` + `db/tx.ts` (`Db`, `withTx`, `DbUsedOutsideTransaction`); baseline booleans converted to real `BOOLEAN`; all 11 services + `layouts`/`settings` moved off `DatabaseAdapter`/dialect branches/`BEGIN·COMMIT·ROLLBACK`; `getInvoices`/`presets.getPresets` id/type interpolation and all of `filterFunctions.ts` parameterized
+- 0.3 check: `tsc -p tsconfig.webserver.json` clean; `eslint src/backend` clean; `vitest run src/backend` → 4 files, 14/14 pass (added `db/__tests__/tx.spec.ts`); manual smoke test of the running server (health, filtered list, create) green
+- Pulled forward from 0.4 of necessity (deleting `client.ts` breaks the old `dbInstance` pattern): all 13 controllers now use `withTx`; deleted `webserver/database.ts`, `webserver/migration.ts`, `webserver/controllers/database.ts`; `requireDB` removed
+- 2 pre-existing bugs fixed in `invoices.ts` (sequence-failure branch returned the wrong result's `.key`) and 1 correctness fix (`duplicateInvoice` validated the new number after already writing `status='closed'`) — all narrow, details in `phase-0-notes.md`
 - 2026-09-15 · 0.1 done: `docker-compose.dev.yml`, `pgTestDb` helper, invoices + layouts specs ported to PostgreSQL
 - 0.1 check: `vitest run src/backend` → 10/10 pass on postgres-test, no PG errors; fixed 2 PG-only legacy bugs (empty `IN ()` in `getInvoices`; stale unique constraint in migration 24)
 - 0.2 done: `0001-baseline.sql` + `runSqlMigrations`; `legacy-columns.json` + `baseline.schema.spec.ts`; 30 legacy migrations and `vite.migrations.config.ts` deleted

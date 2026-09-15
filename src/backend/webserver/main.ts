@@ -2,7 +2,6 @@ import cors from 'cors';
 import express, { type Request, type Response } from 'express';
 import { APP_CONFIG } from './config';
 import { initControllers } from './controllers';
-import { initDatabaseController } from './controllers/database';
 
 const port = Number(process.env.PORT) || Number(APP_CONFIG.PORT);
 const server = process.env.DEV_SERVER_URL || APP_CONFIG.DEV_SERVER_URL;
@@ -21,7 +20,6 @@ app.use(
 app.set('trust proxy', 1);
 
 const main = async () => {
-  initDatabaseController(app);
   initControllers(app);
 
   app.listen(port, server, () => {

@@ -3,7 +3,6 @@ import { createPgTestDb, type PgTestDb } from '../../../__tests__/helpers/pgTest
 import { InvoiceStatus } from '../../enums/invoiceStatus';
 import { InvoiceType } from '../../enums/invoiceType';
 import { Language } from '../../enums/language';
-import type { DatabaseAdapter } from '../../types/DatabaseAdapter';
 import type {
   Invoice,
   InvoiceBusinessSnapshots,
@@ -12,16 +11,20 @@ import type {
 } from '../../types/invoice';
 import { addInvoice, duplicateInvoice, getNextSequence, updateInvoice } from '../invoices';
 
-const insertBusiness = async (db: DatabaseAdapter, name: string, shortName: string) => {
-  return db.run(`INSERT INTO businesses ("name", "shortName") VALUES (?, ?)`, [name, shortName], true);
+const insertBusiness = async (testDb: PgTestDb, name: string, shortName: string) => {
+  return testDb.withTx(db =>
+    db.run(`INSERT INTO businesses ("name", "shortName") VALUES (?, ?)`, [name, shortName], true)
+  );
 };
 
-const insertClient = async (db: DatabaseAdapter, name: string, shortName: string) => {
-  return db.run(`INSERT INTO clients ("name", "shortName") VALUES (?, ?)`, [name, shortName], true);
+const insertClient = async (testDb: PgTestDb, name: string, shortName: string) => {
+  return testDb.withTx(db =>
+    db.run(`INSERT INTO clients ("name", "shortName") VALUES (?, ?)`, [name, shortName], true)
+  );
 };
 
-const getCurrencyId = async (db: DatabaseAdapter, code: string) => {
-  const row = await db.get<{ id: number }>(`SELECT id FROM currencies WHERE code = ?;`, [code]);
+const getCurrencyId = async (testDb: PgTestDb, code: string) => {
+  const row = await testDb.withTx(db => db.get<{ id: number }>(`SELECT id FROM currencies WHERE code = ?;`, [code]));
   return row?.id ?? -1;
 };
 
@@ -109,25 +112,25 @@ const createInvoicePayload = (
 };
 
 const loadNextSequence = async (
-  db: DatabaseAdapter,
+  testDb: PgTestDb,
   businessId: number,
   clientId: number,
   invoiceType: InvoiceType = InvoiceType.invoice
 ) => {
-  const row = await db.get<{ nextSequence: number }>(
-    `SELECT "nextSequence" FROM invoice_sequences WHERE "businessId" = ? AND "clientId" = ? AND "invoiceType" = ?;`,
-    [businessId, clientId, invoiceType]
+  const row = await testDb.withTx(db =>
+    db.get<{ nextSequence: number }>(
+      `SELECT "nextSequence" FROM invoice_sequences WHERE "businessId" = ? AND "clientId" = ? AND "invoiceType" = ?;`,
+      [businessId, clientId, invoiceType]
+    )
   );
   return row ? Number(row.nextSequence) : undefined;
 };
 
 describe('invoice sequence handling', () => {
   let testDb: PgTestDb;
-  let db: DatabaseAdapter;
 
   beforeAll(async () => {
     testDb = await createPgTestDb();
-    db = testDb.db;
   });
 
   afterAll(async () => {
@@ -135,36 +138,42 @@ describe('invoice sequence handling', () => {
   });
 
   it('creates a client-scoped sequence row on addInvoice when missing and advances sequentially', async () => {
-    const businessId = await insertBusiness(db, 'Business A', 'BA');
-    const clientId = await insertClient(db, 'Client A', 'CA');
-    const currencyId = await getCurrencyId(db, 'USD');
+    const businessId = await insertBusiness(testDb, 'Business A', 'BA');
+    const clientId = await insertClient(testDb, 'Client A', 'CA');
+    const currencyId = await getCurrencyId(testDb, 'USD');
 
-    await addInvoice(db, createInvoicePayload(businessId, clientId, currencyId, '1'));
+    await testDb.withTx(db => addInvoice(db, createInvoicePayload(businessId, clientId, currencyId, '1')));
 
-    const result = await addInvoice(db, createInvoicePayload(businessId, clientId, currencyId, '2'));
+    const result = await testDb.withTx(db =>
+      addInvoice(db, createInvoicePayload(businessId, clientId, currencyId, '2'))
+    );
     expect(result.success).toBe(true);
 
-    const sequenceAfterSecondInvoice = await loadNextSequence(db, businessId, clientId);
+    const sequenceAfterSecondInvoice = await loadNextSequence(testDb, businessId, clientId);
     expect(sequenceAfterSecondInvoice).toBe(3);
-    expect((await getNextSequence(db, { businessId, clientId, invoiceType: InvoiceType.invoice })).data).toEqual({
+    expect(
+      (await testDb.withTx(db => getNextSequence(db, { businessId, clientId, invoiceType: InvoiceType.invoice }))).data
+    ).toEqual({
       nextSequence: 3,
       formattedSequence: '3'
     });
   });
 
   it('duplicates an invoice to the next client-scoped sequence when sequence row is missing', async () => {
-    const businessId = await insertBusiness(db, 'Business B', 'BB');
-    const clientId = await insertClient(db, 'Client B', 'CB');
-    const currencyId = await getCurrencyId(db, 'USD');
+    const businessId = await insertBusiness(testDb, 'Business B', 'BB');
+    const clientId = await insertClient(testDb, 'Client B', 'CB');
+    const currencyId = await getCurrencyId(testDb, 'USD');
 
-    const originalResult = await addInvoice(db, createInvoicePayload(businessId, clientId, currencyId, '3'));
+    const originalResult = await testDb.withTx(db =>
+      addInvoice(db, createInvoicePayload(businessId, clientId, currencyId, '3'))
+    );
     expect(originalResult.success).toBe(true);
     expect(originalResult.data).toBeDefined();
 
     const originalInvoice = originalResult.data as Invoice;
     expect(originalInvoice.id).toBeDefined();
 
-    const result = await duplicateInvoice(db, originalInvoice.id as number, InvoiceType.invoice);
+    const result = await testDb.withTx(db => duplicateInvoice(db, originalInvoice.id as number, InvoiceType.invoice));
 
     expect(result.success).toBe(true);
     expect(result.data).toBeDefined();
@@ -172,113 +181,144 @@ describe('invoice sequence handling', () => {
     const duplicatedInvoice = result.data as Invoice;
     expect(duplicatedInvoice.invoiceNumber).toBe('4');
 
-    const sequence = await loadNextSequence(db, businessId, clientId);
+    const sequence = await loadNextSequence(testDb, businessId, clientId);
     expect(sequence).toBe(5);
-    expect((await getNextSequence(db, { businessId, clientId, invoiceType: InvoiceType.invoice })).data).toEqual({
+    expect(
+      (await testDb.withTx(db => getNextSequence(db, { businessId, clientId, invoiceType: InvoiceType.invoice }))).data
+    ).toEqual({
       nextSequence: 5,
       formattedSequence: '5'
     });
   });
 
   it('preserves leading-zero width when suggesting the next sequence', async () => {
-    const businessId = await insertBusiness(db, 'Business C', 'BC');
-    const clientId = await insertClient(db, 'Client C', 'CC');
-    const currencyId = await getCurrencyId(db, 'USD');
+    const businessId = await insertBusiness(testDb, 'Business C', 'BC');
+    const clientId = await insertClient(testDb, 'Client C', 'CC');
+    const currencyId = await getCurrencyId(testDb, 'USD');
 
-    const result = await addInvoice(db, createInvoicePayload(businessId, clientId, currencyId, '000009'));
+    const result = await testDb.withTx(db =>
+      addInvoice(db, createInvoicePayload(businessId, clientId, currencyId, '000009'))
+    );
     expect(result.success).toBe(true);
 
-    expect((await getNextSequence(db, { businessId, clientId, invoiceType: InvoiceType.invoice })).data).toEqual({
+    expect(
+      (await testDb.withTx(db => getNextSequence(db, { businessId, clientId, invoiceType: InvoiceType.invoice }))).data
+    ).toEqual({
       nextSequence: 10,
       formattedSequence: '000010'
     });
   });
 
   it('handles carry for padded values (000999 -> 001000)', async () => {
-    const businessId = await insertBusiness(db, 'Business F', 'BF');
-    const clientId = await insertClient(db, 'Client F', 'CF');
-    const currencyId = await getCurrencyId(db, 'USD');
+    const businessId = await insertBusiness(testDb, 'Business F', 'BF');
+    const clientId = await insertClient(testDb, 'Client F', 'CF');
+    const currencyId = await getCurrencyId(testDb, 'USD');
 
-    const result = await addInvoice(db, createInvoicePayload(businessId, clientId, currencyId, '000999'));
+    const result = await testDb.withTx(db =>
+      addInvoice(db, createInvoicePayload(businessId, clientId, currencyId, '000999'))
+    );
     expect(result.success).toBe(true);
 
-    expect((await getNextSequence(db, { businessId, clientId, invoiceType: InvoiceType.invoice })).data).toEqual({
+    expect(
+      (await testDb.withTx(db => getNextSequence(db, { businessId, clientId, invoiceType: InvoiceType.invoice }))).data
+    ).toEqual({
       nextSequence: 1000,
       formattedSequence: '001000'
     });
   });
 
   it('expands width when incremented sequence exceeds current padding length', async () => {
-    const businessId = await insertBusiness(db, 'Business D', 'BD');
-    const clientId = await insertClient(db, 'Client D', 'CD');
-    const currencyId = await getCurrencyId(db, 'USD');
+    const businessId = await insertBusiness(testDb, 'Business D', 'BD');
+    const clientId = await insertClient(testDb, 'Client D', 'CD');
+    const currencyId = await getCurrencyId(testDb, 'USD');
 
-    const result = await addInvoice(db, createInvoicePayload(businessId, clientId, currencyId, '999999'));
+    const result = await testDb.withTx(db =>
+      addInvoice(db, createInvoicePayload(businessId, clientId, currencyId, '999999'))
+    );
     expect(result.success).toBe(true);
 
-    expect((await getNextSequence(db, { businessId, clientId, invoiceType: InvoiceType.invoice })).data).toEqual({
+    expect(
+      (await testDb.withTx(db => getNextSequence(db, { businessId, clientId, invoiceType: InvoiceType.invoice }))).data
+    ).toEqual({
       nextSequence: 1000000,
       formattedSequence: '1000000'
     });
   });
 
   it('duplicates invoices using padded sequence formatting', async () => {
-    const businessId = await insertBusiness(db, 'Business E', 'BE');
-    const clientId = await insertClient(db, 'Client E', 'CE');
-    const currencyId = await getCurrencyId(db, 'USD');
+    const businessId = await insertBusiness(testDb, 'Business E', 'BE');
+    const clientId = await insertClient(testDb, 'Client E', 'CE');
+    const currencyId = await getCurrencyId(testDb, 'USD');
 
-    const originalResult = await addInvoice(db, createInvoicePayload(businessId, clientId, currencyId, '000005'));
+    const originalResult = await testDb.withTx(db =>
+      addInvoice(db, createInvoicePayload(businessId, clientId, currencyId, '000005'))
+    );
     expect(originalResult.success).toBe(true);
 
     const originalInvoice = originalResult.data as Invoice;
-    const duplicateResult = await duplicateInvoice(db, originalInvoice.id as number, InvoiceType.invoice);
+    const duplicateResult = await testDb.withTx(db =>
+      duplicateInvoice(db, originalInvoice.id as number, InvoiceType.invoice)
+    );
 
     expect(duplicateResult.success).toBe(true);
     expect((duplicateResult.data as Invoice).invoiceNumber).toBe('000006');
 
-    expect((await getNextSequence(db, { businessId, clientId, invoiceType: InvoiceType.invoice })).data).toEqual({
+    expect(
+      (await testDb.withTx(db => getNextSequence(db, { businessId, clientId, invoiceType: InvoiceType.invoice }))).data
+    ).toEqual({
       nextSequence: 7,
       formattedSequence: '000007'
     });
   });
 
   it('preserves the quotation number and sequence when converting to an invoice', async () => {
-    const businessId = await insertBusiness(db, 'Business Conversion', 'BC');
-    const clientId = await insertClient(db, 'Client Conversion', 'CC');
-    const currencyId = await getCurrencyId(db, 'USD');
+    const businessId = await insertBusiness(testDb, 'Business Conversion', 'BC');
+    const clientId = await insertClient(testDb, 'Client Conversion', 'CC');
+    const currencyId = await getCurrencyId(testDb, 'USD');
 
-    const quotationResult = await addInvoice(
-      db,
-      createInvoicePayload(businessId, clientId, currencyId, '000005', InvoiceType.quotation)
+    const quotationResult = await testDb.withTx(db =>
+      addInvoice(db, createInvoicePayload(businessId, clientId, currencyId, '000005', InvoiceType.quotation))
     );
     expect(quotationResult.success).toBe(true);
 
     const quotation = quotationResult.data as Invoice;
-    const conversionSequenceBefore = await getNextSequence(db, {
-      businessId,
-      clientId,
-      invoiceType: InvoiceType.invoice
-    });
-    const conversionResult = await duplicateInvoice(db, quotation.id as number, InvoiceType.invoice);
+    const conversionSequenceBefore = await testDb.withTx(db =>
+      getNextSequence(db, {
+        businessId,
+        clientId,
+        invoiceType: InvoiceType.invoice
+      })
+    );
+    const conversionResult = await testDb.withTx(db =>
+      duplicateInvoice(db, quotation.id as number, InvoiceType.invoice)
+    );
 
     expect(conversionResult.success).toBe(true);
     expect((conversionResult.data as Invoice).invoiceType).toBe(InvoiceType.quotation);
     expect((conversionResult.data as Invoice).invoiceNumber).toBe('000005');
-    expect((await getNextSequence(db, { businessId, clientId, invoiceType: InvoiceType.invoice })).data).toEqual({
+    expect(
+      (await testDb.withTx(db => getNextSequence(db, { businessId, clientId, invoiceType: InvoiceType.invoice }))).data
+    ).toEqual({
       nextSequence: 6,
       formattedSequence: '000006'
     });
 
-    const repeatedConversionResult = await duplicateInvoice(db, quotation.id as number, InvoiceType.invoice);
+    const repeatedConversionResult = await testDb.withTx(db =>
+      duplicateInvoice(db, quotation.id as number, InvoiceType.invoice)
+    );
     expect(repeatedConversionResult.success).toBe(true);
     expect((repeatedConversionResult.data as Invoice).invoiceType).toBe(InvoiceType.quotation);
     expect((repeatedConversionResult.data as Invoice).invoiceNumber).toBe('000005');
-    const repeatedInvoice = await db.get(
-      `SELECT "id" FROM invoices WHERE "businessId" = ? AND "clientId" = ? AND "invoiceType" = ? AND "invoiceNumber" = ?`,
-      [businessId, clientId, InvoiceType.invoice, '000006']
+    const repeatedInvoice = await testDb.withTx(db =>
+      db.get(
+        `SELECT "id" FROM invoices WHERE "businessId" = ? AND "clientId" = ? AND "invoiceType" = ? AND "invoiceNumber" = ?`,
+        [businessId, clientId, InvoiceType.invoice, '000006']
+      )
     );
     expect(repeatedInvoice).toBeDefined();
-    expect((await getNextSequence(db, { businessId, clientId, invoiceType: InvoiceType.invoice })).data).toEqual({
+    expect(
+      (await testDb.withTx(db => getNextSequence(db, { businessId, clientId, invoiceType: InvoiceType.invoice }))).data
+    ).toEqual({
       nextSequence: 7,
       formattedSequence: '000007'
     });
@@ -286,35 +326,43 @@ describe('invoice sequence handling', () => {
   });
 
   it('does not increment sequence when updating an existing invoice', async () => {
-    const businessId = await insertBusiness(db, 'Business G', 'BG');
-    const clientId = await insertClient(db, 'Client G', 'CG');
-    const currencyId = await getCurrencyId(db, 'USD');
+    const businessId = await insertBusiness(testDb, 'Business G', 'BG');
+    const clientId = await insertClient(testDb, 'Client G', 'CG');
+    const currencyId = await getCurrencyId(testDb, 'USD');
 
-    const addResult = await addInvoice(db, createInvoicePayload(businessId, clientId, currencyId, '000005'));
+    const addResult = await testDb.withTx(db =>
+      addInvoice(db, createInvoicePayload(businessId, clientId, currencyId, '000005'))
+    );
     expect(addResult.success).toBe(true);
 
-    const sequenceBeforeUpdate = await getNextSequence(db, {
-      businessId,
-      clientId,
-      invoiceType: InvoiceType.invoice
-    });
+    const sequenceBeforeUpdate = await testDb.withTx(db =>
+      getNextSequence(db, {
+        businessId,
+        clientId,
+        invoiceType: InvoiceType.invoice
+      })
+    );
     expect(sequenceBeforeUpdate.data).toEqual({
       nextSequence: 6,
       formattedSequence: '000006'
     });
 
     const invoice = addResult.data as Invoice;
-    const updateResult = await updateInvoice(db, {
-      ...invoice,
-      customerNotes: 'Updated note'
-    });
+    const updateResult = await testDb.withTx(db =>
+      updateInvoice(db, {
+        ...invoice,
+        customerNotes: 'Updated note'
+      })
+    );
     expect(updateResult.success).toBe(true);
 
-    const sequenceAfterUpdate = await getNextSequence(db, {
-      businessId,
-      clientId,
-      invoiceType: InvoiceType.invoice
-    });
+    const sequenceAfterUpdate = await testDb.withTx(db =>
+      getNextSequence(db, {
+        businessId,
+        clientId,
+        invoiceType: InvoiceType.invoice
+      })
+    );
     expect(sequenceAfterUpdate.data).toEqual({
       nextSequence: 6,
       formattedSequence: '000006'
@@ -322,25 +370,31 @@ describe('invoice sequence handling', () => {
   });
 
   it('updates sequence when invoice number changes during update', async () => {
-    const businessId = await insertBusiness(db, 'Business H', 'BH');
-    const clientId = await insertClient(db, 'Client H', 'CH');
-    const currencyId = await getCurrencyId(db, 'USD');
+    const businessId = await insertBusiness(testDb, 'Business H', 'BH');
+    const clientId = await insertClient(testDb, 'Client H', 'CH');
+    const currencyId = await getCurrencyId(testDb, 'USD');
 
-    const addResult = await addInvoice(db, createInvoicePayload(businessId, clientId, currencyId, '000005'));
+    const addResult = await testDb.withTx(db =>
+      addInvoice(db, createInvoicePayload(businessId, clientId, currencyId, '000005'))
+    );
     expect(addResult.success).toBe(true);
 
     const invoice = addResult.data as Invoice;
-    const updateResult = await updateInvoice(db, {
-      ...invoice,
-      invoiceNumber: '000010'
-    });
+    const updateResult = await testDb.withTx(db =>
+      updateInvoice(db, {
+        ...invoice,
+        invoiceNumber: '000010'
+      })
+    );
     expect(updateResult.success).toBe(true);
 
-    const sequenceAfterUpdate = await getNextSequence(db, {
-      businessId,
-      clientId,
-      invoiceType: InvoiceType.invoice
-    });
+    const sequenceAfterUpdate = await testDb.withTx(db =>
+      getNextSequence(db, {
+        businessId,
+        clientId,
+        invoiceType: InvoiceType.invoice
+      })
+    );
     expect(sequenceAfterUpdate.data).toEqual({
       nextSequence: 11,
       formattedSequence: '000011'

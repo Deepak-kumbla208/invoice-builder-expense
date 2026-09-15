@@ -1,15 +1,14 @@
 import { type Express, type Request, type Response } from 'express';
+import { withTx } from '../../shared/db/tx';
 import * as settingsService from '../../shared/services/settings';
-import { dbInstance } from '../database';
-import { requireDB } from '../utils/functions';
 
 export const initSettingsController = (app: Express) => {
-  app.get('/api/settings', requireDB, async (_req: Request, res: Response) => {
-    const result = await settingsService.getAllSettings(dbInstance!);
+  app.get('/api/settings', async (_req: Request, res: Response) => {
+    const result = await withTx(db => settingsService.getAllSettings(db));
     res.json(result);
   });
-  app.put('/api/settings', requireDB, async (req: Request, res: Response) => {
-    const result = await settingsService.updateSettings(dbInstance!, req.body);
+  app.put('/api/settings', async (req: Request, res: Response) => {
+    const result = await withTx(db => settingsService.updateSettings(db, req.body));
     res.json(result);
   });
 };

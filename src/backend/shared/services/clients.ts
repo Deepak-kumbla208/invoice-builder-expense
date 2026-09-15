@@ -1,5 +1,5 @@
+import type { Db } from '../db/tx';
 import type { Client } from '../types/client';
-import type { DatabaseAdapter } from '../types/DatabaseAdapter';
 import type { EntityWithCounts } from '../types/entityWithCounts';
 import type { FilterData } from '../types/invoiceFilter';
 import type { Response } from '../types/response';
@@ -24,7 +24,7 @@ const clientFields: (keyof Client)[] = [
 ];
 
 export const getAllClients = async (
-  db: DatabaseAdapter,
+  db: Db,
   filter?: FilterData[]
 ): Promise<Response<(Client & EntityWithCounts)[]>> => {
   const getAll = getAllEntities<Client>(db, 'clients', 't', 'i', {
@@ -43,7 +43,7 @@ export const getAllClients = async (
   return getAll(filter ?? []);
 };
 
-export const addClient = async (db: DatabaseAdapter, data: Client): Promise<Response<Client & EntityWithCounts>> => {
+export const addClient = async (db: Db, data: Client): Promise<Response<Client & EntityWithCounts>> => {
   const handle = handleEntity<Client>(db, 'clients', 'c', clientFields, {
     joins: `LEFT JOIN invoices i ON i."clientId" = c."id"`,
     invoiceCountExpr: `
@@ -58,7 +58,7 @@ export const addClient = async (db: DatabaseAdapter, data: Client): Promise<Resp
   return handle(data);
 };
 
-export const updateClient = async (db: DatabaseAdapter, data: Client): Promise<Response<Client & EntityWithCounts>> => {
+export const updateClient = async (db: Db, data: Client): Promise<Response<Client & EntityWithCounts>> => {
   const handle = handleEntity<Client>(db, 'clients', 'c', clientFields, {
     joins: `LEFT JOIN invoices i ON i."clientId" = c.id`,
     invoiceCountExpr: `
@@ -73,16 +73,16 @@ export const updateClient = async (db: DatabaseAdapter, data: Client): Promise<R
   return handle(data, true);
 };
 
-export const deleteClient = async (db: DatabaseAdapter, id: number) => {
+export const deleteClient = async (db: Db, id: number) => {
   try {
     await db.run('DELETE FROM clients WHERE "id" = ?;', [id]);
     return { success: true };
   } catch (error) {
-    return { success: false, ...mapDatabaseError(error, db.type) };
+    return { success: false, ...mapDatabaseError(error) };
   }
 };
 
-export const batchAddClient = async (db: DatabaseAdapter, data: Client[]) => {
+export const batchAddClient = async (db: Db, data: Client[]) => {
   const handle = handleEntity<Client>(db, 'clients', 'c', clientFields, {
     joins: `LEFT JOIN invoices i ON i."clientId" = c."id"`,
     invoiceCountExpr: `
@@ -95,26 +95,14 @@ export const batchAddClient = async (db: DatabaseAdapter, data: Client[]) => {
        `
   });
   try {
-    await db.run('BEGIN');
     for (const row of data) {
       const result = await handle(row);
       if (!result.success) {
-        try {
-          await db.run('ROLLBACK');
-        } catch {
-          throw new Error(`error.rollbackFailed`);
-        }
         return result;
       }
     }
-    await db.run('COMMIT');
     return { success: true };
   } catch (error) {
-    try {
-      await db.run('ROLLBACK');
-    } catch {
-      throw new Error(`error.rollbackFailed`);
-    }
-    return { success: false, ...mapDatabaseError(error, db.type) };
+    return { success: false, ...mapDatabaseError(error) };
   }
 };

@@ -1,25 +1,22 @@
 import type { EntityWithId } from '../../shared/types/entityWithId';
 import type { FilterData } from '../../shared/types/invoiceFilter';
 import type { Response } from '../../shared/types/response';
-import type { DatabaseAdapter } from '../types/DatabaseAdapter';
+import type { Db } from '../db/tx';
 import type { EntityWithCounts } from '../types/entityWithCounts';
 import type { InvoiceAggregation } from '../types/InvoiceAggregation';
-import { getDefaultValue } from './dbHelper';
 import { mapDatabaseError } from './errorFunctions';
-
 import { getHavingClauseFromFilters } from './filterFunctions';
 
 export const getAllEntities =
   <T extends object>(
-    db: DatabaseAdapter,
+    db: Db,
     table: string,
     alias: string,
     invoiceAlias: string,
     aggregation: InvoiceAggregation
   ): ((filter: FilterData[]) => Promise<Response<(T & EntityWithCounts)[]>>) =>
   async (filter: FilterData[]) => {
-    const havingClause = getHavingClauseFromFilters({
-      dbType: db.type,
+    const having = getHavingClauseFromFilters({
       filters: filter,
       invoiceUpdatedAtColumn: `${invoiceAlias}."updatedAt"`,
       invoiceIdColumn: `${invoiceAlias}."id"`,
@@ -34,33 +31,31 @@ export const getAllEntities =
       FROM ${table} ${alias}
       ${aggregation.joins}
       GROUP BY ${alias}."id"
-      ${havingClause || ''}
+      ${having.sql}
       ORDER BY ${alias}."createdAt" DESC
     `;
 
-    const data = await db.all<T & EntityWithCounts>(sql);
+    const data = await db.all<T & EntityWithCounts>(sql, having.params);
 
     return { success: true, data };
   };
 
 export const handleEntity =
   <T extends EntityWithId>(
-    db: DatabaseAdapter,
+    db: Db,
     table: string,
     alias: string,
     fields: readonly (keyof T)[],
     aggregation: InvoiceAggregation
   ) =>
   async (data: T, isUpdate = false): Promise<Response<T & EntityWithCounts>> => {
-    const params = fields.map(key => (data[key] ?? null) as string | number | null);
+    const params = fields.map(key => (data[key] ?? null) as string | number | boolean | null);
 
     try {
       let lastID: number = -1;
 
       if (isUpdate) {
-        const setClause =
-          fields.map(f => `"${String(f)}" = ?`).join(', ') +
-          `, "updatedAt" = ${getDefaultValue("(datetime('now'))", db.type)}`;
+        const setClause = fields.map(f => `"${String(f)}" = ?`).join(', ') + `, "updatedAt" = NOW()`;
         await db.run(`UPDATE ${table} SET ${setClause} WHERE "id" = ?`, [...params, data.id ?? -1], true);
         lastID = data.id ?? -1;
       } else {
@@ -87,6 +82,6 @@ export const handleEntity =
 
       return { success: true, data: row ?? undefined };
     } catch (error) {
-      return { success: false, ...mapDatabaseError(error, db.type) };
+      return { success: false, ...mapDatabaseError(error) };
     }
   };

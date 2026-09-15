@@ -33,12 +33,11 @@ CREATE TABLE banks (
     "qrCodeFileSize" integer,
     "qrCodeFileType" text,
     "qrCodeFileName" text,
-    "isArchived" integer DEFAULT 0 NOT NULL,
+    "isArchived" boolean DEFAULT false NOT NULL,
     "createdAt" timestamp without time zone DEFAULT now() NOT NULL,
     "updatedAt" timestamp without time zone DEFAULT now() NOT NULL,
     "accountHolder" text,
-    "sortOrder" text,
-    CONSTRAINT "banks_isArchived_check" CHECK (("isArchived" = ANY (ARRAY[0, 1])))
+    "sortOrder" text
 );
 
 ALTER TABLE banks ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
@@ -66,7 +65,7 @@ CREATE TABLE businesses (
     "fileType" text,
     "fileName" text,
     description text,
-    "isArchived" integer DEFAULT 0 NOT NULL,
+    "isArchived" boolean DEFAULT false NOT NULL,
     "createdAt" timestamp without time zone DEFAULT now() NOT NULL,
     "updatedAt" timestamp without time zone DEFAULT now() NOT NULL,
     "vatCode" text,
@@ -74,7 +73,6 @@ CREATE TABLE businesses (
     "peppolEndpointId" text,
     "countryCode" text,
     "peppolEndpointSchemeId" text,
-    CONSTRAINT "businesses_isArchived_check" CHECK (("isArchived" = ANY (ARRAY[0, 1]))),
     CONSTRAINT "businesses_shortName_check" CHECK ((length("shortName") <= 2))
 );
 
@@ -90,10 +88,9 @@ ALTER TABLE businesses ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
 CREATE TABLE categories (
     id integer NOT NULL,
     name text NOT NULL,
-    "isArchived" integer DEFAULT 0 NOT NULL,
+    "isArchived" boolean DEFAULT false NOT NULL,
     "createdAt" timestamp without time zone DEFAULT now() NOT NULL,
-    "updatedAt" timestamp without time zone DEFAULT now() NOT NULL,
-    CONSTRAINT "categories_isArchived_check" CHECK (("isArchived" = ANY (ARRAY[0, 1])))
+    "updatedAt" timestamp without time zone DEFAULT now() NOT NULL
 );
 
 ALTER TABLE categories ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
@@ -115,7 +112,7 @@ CREATE TABLE clients (
     code text,
     additional text,
     description text,
-    "isArchived" integer DEFAULT 0 NOT NULL,
+    "isArchived" boolean DEFAULT false NOT NULL,
     "createdAt" timestamp without time zone DEFAULT now() NOT NULL,
     "updatedAt" timestamp without time zone DEFAULT now() NOT NULL,
     "vatCode" text,
@@ -123,7 +120,6 @@ CREATE TABLE clients (
     "countryCode" text,
     "peppolEndpointSchemeId" text,
     "buyerReference" text,
-    CONSTRAINT "clients_isArchived_check" CHECK (("isArchived" = ANY (ARRAY[0, 1]))),
     CONSTRAINT "clients_shortName_check" CHECK ((length("shortName") <= 2))
 );
 
@@ -143,10 +139,9 @@ CREATE TABLE currencies (
     text text NOT NULL,
     format text NOT NULL,
     subunit integer DEFAULT 100 NOT NULL,
-    "isArchived" integer DEFAULT 0 NOT NULL,
+    "isArchived" boolean DEFAULT false NOT NULL,
     "createdAt" timestamp without time zone DEFAULT now() NOT NULL,
-    "updatedAt" timestamp without time zone DEFAULT now() NOT NULL,
-    CONSTRAINT "currencies_isArchived_check" CHECK (("isArchived" = ANY (ARRAY[0, 1])))
+    "updatedAt" timestamp without time zone DEFAULT now() NOT NULL
 );
 
 ALTER TABLE currencies ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
@@ -278,7 +273,7 @@ CREATE TABLE invoice_customizations (
     "tableHeaderStyle" text DEFAULT 'light'::text NOT NULL,
     "tableRowStyle" text DEFAULT 'classic'::text NOT NULL,
     "pageFormat" text DEFAULT 'A4'::text NOT NULL,
-    "labelUpperCase" integer DEFAULT 0 NOT NULL,
+    "labelUpperCase" boolean DEFAULT false NOT NULL,
     "watermarkFileName" text,
     "watermarkFileType" text,
     "watermarkFileSize" integer,
@@ -289,16 +284,12 @@ CREATE TABLE invoice_customizations (
     "paidWatermarkFileData" bytea,
     "createdAt" timestamp without time zone DEFAULT now() NOT NULL,
     "updatedAt" timestamp without time zone DEFAULT now() NOT NULL,
-    "showQuantity" integer DEFAULT 1 NOT NULL,
-    "showUnit" integer DEFAULT 1 NOT NULL,
-    "showRowNo" integer DEFAULT 1 NOT NULL,
+    "showQuantity" boolean DEFAULT true NOT NULL,
+    "showUnit" boolean DEFAULT true NOT NULL,
+    "showRowNo" boolean DEFAULT true NOT NULL,
     "fieldSortOrders" text DEFAULT '{"no":0,"item":1,"unit":2,"quantity":3,"unitCost":4,"total":5}'::text NOT NULL,
     "fontFamily" text DEFAULT 'Roboto'::text NOT NULL,
-    "pdfTexts" text,
-    CONSTRAINT "invoice_customizations_labelUpperCase_check" CHECK (("labelUpperCase" = ANY (ARRAY[0, 1]))),
-    CONSTRAINT "invoice_customizations_showQuantity_check" CHECK (("showQuantity" = ANY (ARRAY[0, 1]))),
-    CONSTRAINT "invoice_customizations_showRowNo_check" CHECK (("showRowNo" = ANY (ARRAY[0, 1]))),
-    CONSTRAINT "invoice_customizations_showUnit_check" CHECK (("showUnit" = ANY (ARRAY[0, 1])))
+    "pdfTexts" text
 );
 
 ALTER TABLE invoice_customizations ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
@@ -437,7 +428,7 @@ CREATE TABLE invoices (
     "issuedAt" timestamp without time zone NOT NULL,
     "dueDate" timestamp without time zone,
     "invoiceNumber" text NOT NULL,
-    "isArchived" integer DEFAULT 0 NOT NULL,
+    "isArchived" boolean DEFAULT false NOT NULL,
     status text DEFAULT 'unpaid'::text NOT NULL,
     "customerNotes" text,
     "thanksNotes" text,
@@ -472,7 +463,6 @@ CREATE TABLE invoices (
     CONSTRAINT invoices_check2 CHECK ((("convertedFromQuotationId" IS NULL) OR ("convertedFromQuotationId" <> id))),
     CONSTRAINT "invoices_discountType_check" CHECK ((("discountType" = ANY (ARRAY['fixed'::text, 'percentage'::text])) OR ("discountType" IS NULL))),
     CONSTRAINT "invoices_invoiceType_check" CHECK (("invoiceType" = ANY (ARRAY['quotation'::text, 'invoice'::text]))),
-    CONSTRAINT "invoices_isArchived_check" CHECK (("isArchived" = ANY (ARRAY[0, 1]))),
     CONSTRAINT invoices_status_check CHECK ((status = ANY (ARRAY['unpaid'::text, 'open'::text, 'closed'::text, 'partially'::text, 'paid'::text]))),
     CONSTRAINT "invoices_surchargeType_check" CHECK ((("surchargeType" = ANY (ARRAY['fixed'::text, 'percentage'::text])) OR ("surchargeType" IS NULL))),
     CONSTRAINT "invoices_taxType_check" CHECK ((("taxType" = ANY (ARRAY['exclusive'::text, 'inclusive'::text, 'deducted'::text])) OR ("taxType" IS NULL)))
@@ -494,10 +484,9 @@ CREATE TABLE items (
     "unitId" integer,
     "categoryId" integer,
     description text,
-    "isArchived" integer DEFAULT 0 NOT NULL,
+    "isArchived" boolean DEFAULT false NOT NULL,
     "createdAt" timestamp without time zone DEFAULT now() NOT NULL,
-    "updatedAt" timestamp without time zone DEFAULT now() NOT NULL,
-    CONSTRAINT "items_isArchived_check" CHECK (("isArchived" = ANY (ARRAY[0, 1])))
+    "updatedAt" timestamp without time zone DEFAULT now() NOT NULL
 );
 
 ALTER TABLE items ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
@@ -512,10 +501,9 @@ ALTER TABLE items ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
 CREATE TABLE layouts (
     id integer NOT NULL,
     schema text NOT NULL,
-    "isArchived" integer DEFAULT 0 NOT NULL,
+    "isArchived" boolean DEFAULT false NOT NULL,
     "createdAt" timestamp without time zone DEFAULT now() NOT NULL,
-    "updatedAt" timestamp without time zone DEFAULT now() NOT NULL,
-    CONSTRAINT "layouts_isArchived_check" CHECK (("isArchived" = ANY (ARRAY[0, 1])))
+    "updatedAt" timestamp without time zone DEFAULT now() NOT NULL
 );
 
 ALTER TABLE layouts ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
@@ -543,10 +531,9 @@ CREATE TABLE presets (
     "signatureType" text,
     "signatureSize" integer,
     "styleProfilesId" integer,
-    "isArchived" integer DEFAULT 0 NOT NULL,
+    "isArchived" boolean DEFAULT false NOT NULL,
     "createdAt" timestamp without time zone DEFAULT now() NOT NULL,
-    "updatedAt" timestamp without time zone DEFAULT now() NOT NULL,
-    CONSTRAINT "presets_isArchived_check" CHECK (("isArchived" = ANY (ARRAY[0, 1])))
+    "updatedAt" timestamp without time zone DEFAULT now() NOT NULL
 );
 
 ALTER TABLE presets ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
@@ -563,32 +550,21 @@ CREATE TABLE settings (
     language text DEFAULT 'en'::text NOT NULL,
     "amountFormat" text DEFAULT 'en-US'::text NOT NULL,
     "dateFormat" text DEFAULT 'MM/dd/yyyy'::text NOT NULL,
-    "isDarkMode" integer DEFAULT 1 NOT NULL,
+    "isDarkMode" boolean DEFAULT true NOT NULL,
     "invoicePrefix" text,
     "invoiceSuffix" text,
-    "shouldIncludeYear" integer DEFAULT 1 NOT NULL,
-    "shouldIncludeMonth" integer DEFAULT 1 NOT NULL,
-    "shouldIncludeBusinessName" integer DEFAULT 1 NOT NULL,
-    "quotesON" integer DEFAULT 1 NOT NULL,
-    "reportsON" integer DEFAULT 1 NOT NULL,
+    "shouldIncludeYear" boolean DEFAULT true NOT NULL,
+    "shouldIncludeMonth" boolean DEFAULT true NOT NULL,
+    "shouldIncludeBusinessName" boolean DEFAULT true NOT NULL,
+    "quotesON" boolean DEFAULT true NOT NULL,
+    "reportsON" boolean DEFAULT true NOT NULL,
     "createdAt" timestamp without time zone DEFAULT now() NOT NULL,
     "updatedAt" timestamp without time zone DEFAULT now() NOT NULL,
-    "styleProfilesON" integer DEFAULT 1 NOT NULL,
-    "presetsON" integer DEFAULT 1 NOT NULL,
-    "ublON" integer DEFAULT 1 NOT NULL,
-    "xrechnungON" integer DEFAULT 1 NOT NULL,
-    "receiptPrintingOn" integer DEFAULT 1 NOT NULL,
-    CONSTRAINT "settings_isDarkMode_check" CHECK (("isDarkMode" = ANY (ARRAY[0, 1]))),
-    CONSTRAINT "settings_presetsON_check" CHECK (("presetsON" = ANY (ARRAY[0, 1]))),
-    CONSTRAINT "settings_quotesON_check" CHECK (("quotesON" = ANY (ARRAY[0, 1]))),
-    CONSTRAINT "settings_receiptPrintingOn_check" CHECK (("receiptPrintingOn" = ANY (ARRAY[0, 1]))),
-    CONSTRAINT "settings_reportsON_check" CHECK (("reportsON" = ANY (ARRAY[0, 1]))),
-    CONSTRAINT "settings_shouldIncludeBusinessName_check" CHECK (("shouldIncludeBusinessName" = ANY (ARRAY[0, 1]))),
-    CONSTRAINT "settings_shouldIncludeMonth_check" CHECK (("shouldIncludeMonth" = ANY (ARRAY[0, 1]))),
-    CONSTRAINT "settings_shouldIncludeYear_check" CHECK (("shouldIncludeYear" = ANY (ARRAY[0, 1]))),
-    CONSTRAINT "settings_styleProfilesON_check" CHECK (("styleProfilesON" = ANY (ARRAY[0, 1]))),
-    CONSTRAINT "settings_ublON_check" CHECK (("ublON" = ANY (ARRAY[0, 1]))),
-    CONSTRAINT "settings_xrechnungON_check" CHECK (("xrechnungON" = ANY (ARRAY[0, 1])))
+    "styleProfilesON" boolean DEFAULT true NOT NULL,
+    "presetsON" boolean DEFAULT true NOT NULL,
+    "ublON" boolean DEFAULT true NOT NULL,
+    "xrechnungON" boolean DEFAULT true NOT NULL,
+    "receiptPrintingOn" boolean DEFAULT true NOT NULL
 );
 
 ALTER TABLE settings ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
@@ -603,14 +579,14 @@ ALTER TABLE settings ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
 CREATE TABLE style_profiles (
     id integer NOT NULL,
     name text NOT NULL,
-    "isArchived" integer DEFAULT 0 NOT NULL,
+    "isArchived" boolean DEFAULT false NOT NULL,
     color text,
     "logoSize" text,
     "fontSize" text,
     "tableHeaderStyle" text,
     "tableRowStyle" text,
     "pageFormat" text,
-    "labelUpperCase" integer DEFAULT 0 NOT NULL,
+    "labelUpperCase" boolean DEFAULT false NOT NULL,
     "watermarkFileName" text,
     "watermarkFileType" text,
     "watermarkFileSize" integer,
@@ -621,18 +597,13 @@ CREATE TABLE style_profiles (
     "paidWatermarkFileData" bytea,
     "createdAt" timestamp without time zone DEFAULT now() NOT NULL,
     "updatedAt" timestamp without time zone DEFAULT now() NOT NULL,
-    "showQuantity" integer DEFAULT 1 NOT NULL,
-    "showUnit" integer DEFAULT 1 NOT NULL,
-    "showRowNo" integer DEFAULT 1 NOT NULL,
+    "showQuantity" boolean DEFAULT true NOT NULL,
+    "showUnit" boolean DEFAULT true NOT NULL,
+    "showRowNo" boolean DEFAULT true NOT NULL,
     "fieldSortOrders" text DEFAULT '{"no":0,"item":1,"unit":2,"quantity":3,"unitCost":4,"total":5}'::text NOT NULL,
     "fontFamily" text,
     "pdfTexts" text,
-    "layoutId" integer,
-    CONSTRAINT "style_profiles_customizationLabelUpperCase_check" CHECK (("labelUpperCase" = ANY (ARRAY[0, 1]))),
-    CONSTRAINT "style_profiles_isArchived_check" CHECK (("isArchived" = ANY (ARRAY[0, 1]))),
-    CONSTRAINT "style_profiles_showQuantity_check" CHECK (("showQuantity" = ANY (ARRAY[0, 1]))),
-    CONSTRAINT "style_profiles_showRowNo_check" CHECK (("showRowNo" = ANY (ARRAY[0, 1]))),
-    CONSTRAINT "style_profiles_showUnit_check" CHECK (("showUnit" = ANY (ARRAY[0, 1])))
+    "layoutId" integer
 );
 
 ALTER TABLE style_profiles ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
@@ -647,10 +618,9 @@ ALTER TABLE style_profiles ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
 CREATE TABLE units (
     id integer NOT NULL,
     name text NOT NULL,
-    "isArchived" integer DEFAULT 0 NOT NULL,
+    "isArchived" boolean DEFAULT false NOT NULL,
     "createdAt" timestamp without time zone DEFAULT now() NOT NULL,
-    "updatedAt" timestamp without time zone DEFAULT now() NOT NULL,
-    CONSTRAINT "units_isArchived_check" CHECK (("isArchived" = ANY (ARRAY[0, 1])))
+    "updatedAt" timestamp without time zone DEFAULT now() NOT NULL
 );
 
 ALTER TABLE units ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
@@ -930,42 +900,42 @@ ALTER TABLE ONLY presets
 ALTER TABLE ONLY style_profiles
     ADD CONSTRAINT "style_profiles_layoutId_fkey" FOREIGN KEY ("layoutId") REFERENCES layouts(id);
 
-INSERT INTO currencies (id, code, symbol, text, format, subunit, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (1, 'USD', '$', 'United States Dollar', '{symbol}{amount}', 100, 0, now(), now());
-INSERT INTO currencies (id, code, symbol, text, format, subunit, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (2, 'EUR', '€', 'Euro', '{symbol}{amount}', 100, 0, now(), now());
-INSERT INTO currencies (id, code, symbol, text, format, subunit, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (3, 'SEK', 'kr', 'Swedish Krona', '{symbol} {amount}', 100, 0, now(), now());
-INSERT INTO currencies (id, code, symbol, text, format, subunit, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (4, 'GBP', '£', 'British Pound', '{symbol}{amount}', 100, 0, now(), now());
-INSERT INTO currencies (id, code, symbol, text, format, subunit, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (5, 'JPY', '¥', 'Japanese Yen', '{symbol}{amount}', 1, 0, now(), now());
-INSERT INTO currencies (id, code, symbol, text, format, subunit, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (6, 'AUD', 'A$', 'Australian Dollar', '{symbol}{amount}', 100, 0, now(), now());
-INSERT INTO currencies (id, code, symbol, text, format, subunit, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (7, 'CAD', 'CA$', 'Canadian Dollar', '{symbol}{amount}', 100, 0, now(), now());
-INSERT INTO currencies (id, code, symbol, text, format, subunit, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (8, 'CHF', 'CHF', 'Swiss Franc', '{symbol} {amount}', 100, 0, now(), now());
-INSERT INTO currencies (id, code, symbol, text, format, subunit, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (9, 'CNY', '¥', 'Chinese Yuan', '{symbol}{amount}', 100, 0, now(), now());
-INSERT INTO currencies (id, code, symbol, text, format, subunit, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (10, 'INR', '₹', 'Indian Rupee', '{symbol}{amount}', 100, 0, now(), now());
+INSERT INTO currencies (id, code, symbol, text, format, subunit, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (1, 'USD', '$', 'United States Dollar', '{symbol}{amount}', 100, false, now(), now());
+INSERT INTO currencies (id, code, symbol, text, format, subunit, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (2, 'EUR', '€', 'Euro', '{symbol}{amount}', 100, false, now(), now());
+INSERT INTO currencies (id, code, symbol, text, format, subunit, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (3, 'SEK', 'kr', 'Swedish Krona', '{symbol} {amount}', 100, false, now(), now());
+INSERT INTO currencies (id, code, symbol, text, format, subunit, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (4, 'GBP', '£', 'British Pound', '{symbol}{amount}', 100, false, now(), now());
+INSERT INTO currencies (id, code, symbol, text, format, subunit, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (5, 'JPY', '¥', 'Japanese Yen', '{symbol}{amount}', 1, false, now(), now());
+INSERT INTO currencies (id, code, symbol, text, format, subunit, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (6, 'AUD', 'A$', 'Australian Dollar', '{symbol}{amount}', 100, false, now(), now());
+INSERT INTO currencies (id, code, symbol, text, format, subunit, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (7, 'CAD', 'CA$', 'Canadian Dollar', '{symbol}{amount}', 100, false, now(), now());
+INSERT INTO currencies (id, code, symbol, text, format, subunit, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (8, 'CHF', 'CHF', 'Swiss Franc', '{symbol} {amount}', 100, false, now(), now());
+INSERT INTO currencies (id, code, symbol, text, format, subunit, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (9, 'CNY', '¥', 'Chinese Yuan', '{symbol}{amount}', 100, false, now(), now());
+INSERT INTO currencies (id, code, symbol, text, format, subunit, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (10, 'INR', '₹', 'Indian Rupee', '{symbol}{amount}', 100, false, now(), now());
 
-INSERT INTO layouts (id, schema, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (1, '{"schemaVersion":1,"meta":{"name":"Classic","description":"Pre-created layout using bank payment information for new invoices and quotes."},"sections":[{"type":"watermark","visible":"auto","watermarkOrder":"paidFirst"},{"type":"header","visible":true,"blocks":[{"type":"row","children":[{"type":"column","width":"50%","children":[{"type":"row","children":[{"type":"logo"},{"type":"businessInfo"}],"align":"start","justify":"between","gap":5}]},{"type":"column","width":"50%","children":[{"type":"invoiceMeta","showTitle":true}]}],"align":"start","justify":"between"},{"type":"row","children":[{"type":"clientInfo"}],"align":"start","justify":"between","paddingTop":20}]},{"type":"itemsTable","visible":true},{"type":"financialTotals","visible":true},{"type":"paymentInfo","visible":"auto"},{"type":"notes","visible":"auto"},{"type":"signature","visible":"auto"},{"type":"pageCounter","visible":true}]}', 0, now(), now());
-INSERT INTO layouts (id, schema, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (2, '{"schemaVersion":1,"meta":{"name":"Legacy Classic","description":"Pre-created legacy layout preserved for existing documents that use business payment information. Do not use for new invoices or quotes."},"sections":[{"type":"watermark","visible":"auto","watermarkOrder":"paidFirst"},{"type":"header","visible":true,"blocks":[{"type":"row","children":[{"type":"column","width":"50%","children":[{"type":"row","children":[{"type":"logo"},{"type":"businessInfo"}],"align":"start","justify":"between","gap":5}]},{"type":"column","width":"50%","children":[{"type":"invoiceMeta","showTitle":true}]}],"align":"start","justify":"between"},{"type":"row","children":[{"type":"column","width":"50%","children":[{"type":"clientInfo"}]},{"type":"column","width":"50%","align":"end","children":[{"type":"paymentInfo","paymentSource":"legacyBusiness","width":"60%"}]}],"align":"start","justify":"between","paddingTop":20}]},{"type":"itemsTable","visible":true,"columnSizing":"proportional"},{"type":"financialTotals","visible":true},{"type":"notes","visible":"auto"},{"type":"signature","visible":"auto"},{"type":"pageCounter","visible":true}]}', 1, now(), now());
-INSERT INTO layouts (id, schema, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (3, '{"schemaVersion":1,"meta":{"name":"Modern","description":"Pre-created layout using bank payment information for new invoices and quotes."},"sections":[{"type":"watermark","visible":"auto","watermarkOrder":"paidFirst"},{"type":"header","visible":true,"blocks":[{"type":"row","children":[{"type":"title"},{"type":"logo"}],"align":"start","justify":"between","paddingBottom":20},{"type":"row","children":[{"type":"businessInfo"},{"type":"invoiceMeta","boxed":true,"showInvoiceLabel":true}],"align":"start","justify":"between"},{"type":"row","children":[{"type":"clientInfo"}],"align":"start","justify":"between","paddingTop":20}]},{"type":"itemsTable","visible":true},{"type":"financialTotals","visible":true},{"type":"paymentInfo","visible":"auto"},{"type":"notes","visible":"auto"},{"type":"signature","visible":"auto"},{"type":"pageCounter","visible":true}]}', 0, now(), now());
-INSERT INTO layouts (id, schema, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (4, '{"schemaVersion":1,"meta":{"name":"Legacy Modern","description":"Pre-created legacy layout preserved for existing documents that use business payment information. Do not use for new invoices or quotes."},"sections":[{"type":"watermark","visible":"auto","watermarkOrder":"paidFirst"},{"type":"header","visible":true,"blocks":[{"type":"row","children":[{"type":"title"},{"type":"logo"}],"align":"start","justify":"between","paddingBottom":20},{"type":"row","children":[{"type":"column","width":"50%","children":[{"type":"businessInfo"}]},{"type":"column","width":"50%","children":[{"type":"invoiceMeta","showInvoiceLabel":true,"boxed":true}]}],"align":"start","justify":"between"},{"type":"row","children":[{"type":"column","width":"50%","children":[{"type":"clientInfo"}]},{"type":"column","width":"50%","align":"end","children":[{"type":"paymentInfo","paymentSource":"legacyBusiness","width":"60%"}]}],"align":"start","justify":"between","paddingTop":20}]},{"type":"itemsTable","visible":true,"columnSizing":"proportional"},{"type":"financialTotals","visible":true},{"type":"notes","visible":"auto"},{"type":"signature","visible":"auto"},{"type":"pageCounter","visible":true}]}', 1, now(), now());
-INSERT INTO layouts (id, schema, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (5, '{"schemaVersion":1,"meta":{"name":"Compact","description":"Pre-created layout using bank payment information for new invoices and quotes."},"sections":[{"type":"watermark","visible":"auto","watermarkOrder":"paidFirst"},{"type":"header","visible":true,"blocks":[{"type":"column","children":[{"type":"title"}],"align":"center","paddingBottom":20},{"type":"row","children":[{"type":"column","children":[{"type":"businessInfo"}],"width":"40%"},{"type":"column","children":[{"type":"clientInfo"}],"width":"40%"},{"type":"column","children":[{"type":"invoiceMeta","showInvoiceLabel":true}],"width":"20%"}],"align":"start","justify":"between","gap":10}]},{"type":"itemsTable","visible":true},{"type":"financialTotals","visible":true},{"type":"notes","visible":"auto"},{"type":"signature","visible":"auto"},{"type":"pageCounter","visible":true}]}', 0, now(), now());
-INSERT INTO layouts (id, schema, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (6, '{"schemaVersion":1,"meta":{"name":"Legacy Compact","description":"Pre-created legacy layout preserved for existing documents that use business payment information. Do not use for new invoices or quotes."},"sections":[{"type":"watermark","visible":"auto","watermarkOrder":"paidFirst"},{"type":"header","visible":true,"blocks":[{"type":"column","children":[{"type":"title"}],"align":"center","paddingBottom":20},{"type":"row","children":[{"type":"column","children":[{"type":"businessInfo"}],"width":"40%"},{"type":"column","children":[{"type":"clientInfo"}],"width":"40%"},{"type":"column","children":[{"type":"invoiceMeta","showInvoiceLabel":true}],"width":"20%"}],"align":"start","justify":"between","gap":10}]},{"type":"itemsTable","visible":true,"columnSizing":"proportional"},{"type":"totalsRow","visible":true,"totalsBlocks":[{"type":"paymentInfo","paymentSource":"legacyBusiness"},{"type":"spacer"},{"type":"financialTotals"}]},{"type":"notes","visible":"auto"},{"type":"signature","visible":"auto"},{"type":"pageCounter","visible":true}]}', 1, now(), now());
+INSERT INTO layouts (id, schema, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (1, '{"schemaVersion":1,"meta":{"name":"Classic","description":"Pre-created layout using bank payment information for new invoices and quotes."},"sections":[{"type":"watermark","visible":"auto","watermarkOrder":"paidFirst"},{"type":"header","visible":true,"blocks":[{"type":"row","children":[{"type":"column","width":"50%","children":[{"type":"row","children":[{"type":"logo"},{"type":"businessInfo"}],"align":"start","justify":"between","gap":5}]},{"type":"column","width":"50%","children":[{"type":"invoiceMeta","showTitle":true}]}],"align":"start","justify":"between"},{"type":"row","children":[{"type":"clientInfo"}],"align":"start","justify":"between","paddingTop":20}]},{"type":"itemsTable","visible":true},{"type":"financialTotals","visible":true},{"type":"paymentInfo","visible":"auto"},{"type":"notes","visible":"auto"},{"type":"signature","visible":"auto"},{"type":"pageCounter","visible":true}]}', false, now(), now());
+INSERT INTO layouts (id, schema, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (2, '{"schemaVersion":1,"meta":{"name":"Legacy Classic","description":"Pre-created legacy layout preserved for existing documents that use business payment information. Do not use for new invoices or quotes."},"sections":[{"type":"watermark","visible":"auto","watermarkOrder":"paidFirst"},{"type":"header","visible":true,"blocks":[{"type":"row","children":[{"type":"column","width":"50%","children":[{"type":"row","children":[{"type":"logo"},{"type":"businessInfo"}],"align":"start","justify":"between","gap":5}]},{"type":"column","width":"50%","children":[{"type":"invoiceMeta","showTitle":true}]}],"align":"start","justify":"between"},{"type":"row","children":[{"type":"column","width":"50%","children":[{"type":"clientInfo"}]},{"type":"column","width":"50%","align":"end","children":[{"type":"paymentInfo","paymentSource":"legacyBusiness","width":"60%"}]}],"align":"start","justify":"between","paddingTop":20}]},{"type":"itemsTable","visible":true,"columnSizing":"proportional"},{"type":"financialTotals","visible":true},{"type":"notes","visible":"auto"},{"type":"signature","visible":"auto"},{"type":"pageCounter","visible":true}]}', true, now(), now());
+INSERT INTO layouts (id, schema, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (3, '{"schemaVersion":1,"meta":{"name":"Modern","description":"Pre-created layout using bank payment information for new invoices and quotes."},"sections":[{"type":"watermark","visible":"auto","watermarkOrder":"paidFirst"},{"type":"header","visible":true,"blocks":[{"type":"row","children":[{"type":"title"},{"type":"logo"}],"align":"start","justify":"between","paddingBottom":20},{"type":"row","children":[{"type":"businessInfo"},{"type":"invoiceMeta","boxed":true,"showInvoiceLabel":true}],"align":"start","justify":"between"},{"type":"row","children":[{"type":"clientInfo"}],"align":"start","justify":"between","paddingTop":20}]},{"type":"itemsTable","visible":true},{"type":"financialTotals","visible":true},{"type":"paymentInfo","visible":"auto"},{"type":"notes","visible":"auto"},{"type":"signature","visible":"auto"},{"type":"pageCounter","visible":true}]}', false, now(), now());
+INSERT INTO layouts (id, schema, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (4, '{"schemaVersion":1,"meta":{"name":"Legacy Modern","description":"Pre-created legacy layout preserved for existing documents that use business payment information. Do not use for new invoices or quotes."},"sections":[{"type":"watermark","visible":"auto","watermarkOrder":"paidFirst"},{"type":"header","visible":true,"blocks":[{"type":"row","children":[{"type":"title"},{"type":"logo"}],"align":"start","justify":"between","paddingBottom":20},{"type":"row","children":[{"type":"column","width":"50%","children":[{"type":"businessInfo"}]},{"type":"column","width":"50%","children":[{"type":"invoiceMeta","showInvoiceLabel":true,"boxed":true}]}],"align":"start","justify":"between"},{"type":"row","children":[{"type":"column","width":"50%","children":[{"type":"clientInfo"}]},{"type":"column","width":"50%","align":"end","children":[{"type":"paymentInfo","paymentSource":"legacyBusiness","width":"60%"}]}],"align":"start","justify":"between","paddingTop":20}]},{"type":"itemsTable","visible":true,"columnSizing":"proportional"},{"type":"financialTotals","visible":true},{"type":"notes","visible":"auto"},{"type":"signature","visible":"auto"},{"type":"pageCounter","visible":true}]}', true, now(), now());
+INSERT INTO layouts (id, schema, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (5, '{"schemaVersion":1,"meta":{"name":"Compact","description":"Pre-created layout using bank payment information for new invoices and quotes."},"sections":[{"type":"watermark","visible":"auto","watermarkOrder":"paidFirst"},{"type":"header","visible":true,"blocks":[{"type":"column","children":[{"type":"title"}],"align":"center","paddingBottom":20},{"type":"row","children":[{"type":"column","children":[{"type":"businessInfo"}],"width":"40%"},{"type":"column","children":[{"type":"clientInfo"}],"width":"40%"},{"type":"column","children":[{"type":"invoiceMeta","showInvoiceLabel":true}],"width":"20%"}],"align":"start","justify":"between","gap":10}]},{"type":"itemsTable","visible":true},{"type":"financialTotals","visible":true},{"type":"notes","visible":"auto"},{"type":"signature","visible":"auto"},{"type":"pageCounter","visible":true}]}', false, now(), now());
+INSERT INTO layouts (id, schema, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (6, '{"schemaVersion":1,"meta":{"name":"Legacy Compact","description":"Pre-created legacy layout preserved for existing documents that use business payment information. Do not use for new invoices or quotes."},"sections":[{"type":"watermark","visible":"auto","watermarkOrder":"paidFirst"},{"type":"header","visible":true,"blocks":[{"type":"column","children":[{"type":"title"}],"align":"center","paddingBottom":20},{"type":"row","children":[{"type":"column","children":[{"type":"businessInfo"}],"width":"40%"},{"type":"column","children":[{"type":"clientInfo"}],"width":"40%"},{"type":"column","children":[{"type":"invoiceMeta","showInvoiceLabel":true}],"width":"20%"}],"align":"start","justify":"between","gap":10}]},{"type":"itemsTable","visible":true,"columnSizing":"proportional"},{"type":"totalsRow","visible":true,"totalsBlocks":[{"type":"paymentInfo","paymentSource":"legacyBusiness"},{"type":"spacer"},{"type":"financialTotals"}]},{"type":"notes","visible":"auto"},{"type":"signature","visible":"auto"},{"type":"pageCounter","visible":true}]}', true, now(), now());
 
-INSERT INTO categories (id, name, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (1, 'Goods', 0, now(), now());
-INSERT INTO categories (id, name, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (2, 'Services', 0, now(), now());
+INSERT INTO categories (id, name, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (1, 'Goods', false, now(), now());
+INSERT INTO categories (id, name, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (2, 'Services', false, now(), now());
 
-INSERT INTO units (id, name, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (1, 'pcs', 0, now(), now());
-INSERT INTO units (id, name, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (2, 'kgs', 0, now(), now());
-INSERT INTO units (id, name, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (3, 'gs', 0, now(), now());
-INSERT INTO units (id, name, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (4, 'lbs', 0, now(), now());
-INSERT INTO units (id, name, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (5, 'ozs', 0, now(), now());
-INSERT INTO units (id, name, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (6, 'ls', 0, now(), now());
-INSERT INTO units (id, name, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (7, 'mls', 0, now(), now());
-INSERT INTO units (id, name, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (8, 'ms', 0, now(), now());
-INSERT INTO units (id, name, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (9, 'cms', 0, now(), now());
-INSERT INTO units (id, name, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (10, 'fts', 0, now(), now());
-INSERT INTO units (id, name, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (11, 'hrs', 0, now(), now());
-INSERT INTO units (id, name, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (12, 'mins', 0, now(), now());
-INSERT INTO units (id, name, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (13, 'secs', 0, now(), now());
+INSERT INTO units (id, name, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (1, 'pcs', false, now(), now());
+INSERT INTO units (id, name, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (2, 'kgs', false, now(), now());
+INSERT INTO units (id, name, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (3, 'gs', false, now(), now());
+INSERT INTO units (id, name, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (4, 'lbs', false, now(), now());
+INSERT INTO units (id, name, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (5, 'ozs', false, now(), now());
+INSERT INTO units (id, name, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (6, 'ls', false, now(), now());
+INSERT INTO units (id, name, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (7, 'mls', false, now(), now());
+INSERT INTO units (id, name, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (8, 'ms', false, now(), now());
+INSERT INTO units (id, name, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (9, 'cms', false, now(), now());
+INSERT INTO units (id, name, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (10, 'fts', false, now(), now());
+INSERT INTO units (id, name, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (11, 'hrs', false, now(), now());
+INSERT INTO units (id, name, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (12, 'mins', false, now(), now());
+INSERT INTO units (id, name, "isArchived", "createdAt", "updatedAt") OVERRIDING SYSTEM VALUE VALUES (13, 'secs', false, now(), now());
 
-INSERT INTO settings (id, language, "amountFormat", "dateFormat", "isDarkMode", "invoicePrefix", "invoiceSuffix", "shouldIncludeYear", "shouldIncludeMonth", "shouldIncludeBusinessName", "quotesON", "reportsON", "createdAt", "updatedAt", "styleProfilesON", "presetsON", "ublON", "xrechnungON", "receiptPrintingOn") OVERRIDING SYSTEM VALUE VALUES (1, 'en', 'en-US', 'MM/dd/yyyy', 1, NULL, NULL, 1, 1, 1, 1, 1, now(), now(), 1, 1, 1, 1, 1);
+INSERT INTO settings (id, language, "amountFormat", "dateFormat", "isDarkMode", "invoicePrefix", "invoiceSuffix", "shouldIncludeYear", "shouldIncludeMonth", "shouldIncludeBusinessName", "quotesON", "reportsON", "createdAt", "updatedAt", "styleProfilesON", "presetsON", "ublON", "xrechnungON", "receiptPrintingOn") OVERRIDING SYSTEM VALUE VALUES (1, 'en', 'en-US', 'MM/dd/yyyy', true, NULL, NULL, true, true, true, true, true, now(), now(), true, true, true, true, true);
 
 SELECT pg_catalog.setval('categories_id_seq', 2, true);
 

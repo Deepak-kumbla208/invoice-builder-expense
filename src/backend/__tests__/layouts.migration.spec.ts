@@ -1,17 +1,14 @@
 // @vitest-environment node
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { DatabaseAdapter } from '../shared/types/DatabaseAdapter';
 import { createPgTestDb, type PgTestDb } from './helpers/pgTestDb';
 
-type LayoutRow = { id: number; schema: string; isArchived: number | boolean };
+type LayoutRow = { id: number; schema: string; isArchived: boolean };
 
 describe('baseline layout seeds', () => {
   let testDb: PgTestDb;
-  let db: DatabaseAdapter;
 
   beforeAll(async () => {
     testDb = await createPgTestDb();
-    db = testDb.db;
   });
 
   afterAll(async () => {
@@ -19,7 +16,9 @@ describe('baseline layout seeds', () => {
   });
 
   it('seeds active and archived built-in layouts', async () => {
-    const layouts = await db.all<LayoutRow>('SELECT "id", "schema", "isArchived" FROM layouts ORDER BY "id"');
+    const layouts = await testDb.withTx(db =>
+      db.all<LayoutRow>('SELECT "id", "schema", "isArchived" FROM layouts ORDER BY "id"')
+    );
     const names = layouts.map(layout => JSON.parse(layout.schema).meta.name);
 
     expect(names).toEqual(

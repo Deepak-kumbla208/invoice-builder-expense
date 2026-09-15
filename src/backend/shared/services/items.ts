@@ -1,10 +1,9 @@
 import type { Response } from '../../shared/types/response';
-import type { DatabaseAdapter } from '../types/DatabaseAdapter';
+import type { Db } from '../db/tx';
 import type { EntityWithCounts } from '../types/entityWithCounts';
 import type { EntityWithId } from '../types/entityWithId';
 import type { FilterData } from '../types/invoiceFilter';
 import type { Item } from '../types/item';
-import { getDefaultValue } from '../utils/dbHelper';
 import { mapDatabaseError } from '../utils/errorFunctions';
 import { getHavingClauseFromFilters } from '../utils/filterFunctions';
 import { resolveItemRelations } from '../utils/relationsFunctions';
@@ -12,17 +11,15 @@ import { resolveItemRelations } from '../utils/relationsFunctions';
 const itemFields: (keyof Item)[] = ['name', 'amount', 'unitId', 'categoryId', 'description', 'isArchived'];
 
 const handleItemEntity =
-  <T extends EntityWithId>(db: DatabaseAdapter, table: string, fields: readonly (keyof T)[]) =>
+  <T extends EntityWithId>(db: Db, table: string, fields: readonly (keyof T)[]) =>
   async (data: T, isUpdate = false): Promise<Response<T & EntityWithCounts>> => {
-    const params = fields.map(key => (data[key] ?? null) as string | number | null);
+    const params = fields.map(key => (data[key] ?? null) as string | number | boolean | null);
 
     try {
       let lastID: number | void = -1;
 
       if (isUpdate) {
-        const setClause =
-          fields.map(f => `"${String(f)}" = ?`).join(', ') +
-          `, "updatedAt" = ${getDefaultValue("(datetime('now'))", db.type)}`;
+        const setClause = fields.map(f => `"${String(f)}" = ?`).join(', ') + `, "updatedAt" = NOW()`;
 
         await db.run(`UPDATE ${table} SET ${setClause} WHERE "id" = ?`, [...params, data.id ?? -1], true);
         lastID = data.id ?? -1;
@@ -56,15 +53,14 @@ const handleItemEntity =
 
       return { success: true, data: row ?? undefined };
     } catch (error) {
-      return { success: false, ...mapDatabaseError(error, db.type) };
+      return { success: false, ...mapDatabaseError(error) };
     }
   };
 
 export const getAllItemEntities =
-  <T extends object>(db: DatabaseAdapter): ((filter: FilterData[]) => Promise<Response<(T & EntityWithCounts)[]>>) =>
+  <T extends object>(db: Db): ((filter: FilterData[]) => Promise<Response<(T & EntityWithCounts)[]>>) =>
   async (filter: FilterData[]) => {
-    const havingClause = getHavingClauseFromFilters({
-      dbType: db.type,
+    const having = getHavingClauseFromFilters({
       filters: filter ?? [],
       invoiceUpdatedAtColumn: 'inv."updatedAt"',
       invoiceIdColumn: 'inv."id"',
@@ -84,63 +80,51 @@ export const getAllItemEntities =
       LEFT JOIN invoice_items ii ON ii."itemId" = it."id"
       LEFT JOIN invoices inv ON ii."parentInvoiceId" = inv."id"
       GROUP BY it."id", u."name", c."name"
-      ${havingClause ? havingClause : ''}
+      ${having.sql}
       ORDER BY it."createdAt" DESC
     `;
 
-    const data = await db.all<T & EntityWithCounts>(sql);
+    const data = await db.all<T & EntityWithCounts>(sql, having.params);
 
     return { success: true, data };
   };
 
-export const getAllItems = async (db: DatabaseAdapter, filter?: FilterData[]) => {
+export const getAllItems = async (db: Db, filter?: FilterData[]) => {
   const getAll = await getAllItemEntities(db);
   return getAll(filter ?? []);
 };
 
-export const addItem = async (db: DatabaseAdapter, data: Item) => {
+export const addItem = async (db: Db, data: Item) => {
   const handle = handleItemEntity<Item>(db, 'items', itemFields);
   return handle(data);
 };
 
-export const updateItem = async (db: DatabaseAdapter, data: Item) => {
+export const updateItem = async (db: Db, data: Item) => {
   const handle = handleItemEntity<Item>(db, 'items', itemFields);
   return handle(data, true);
 };
 
-export const deleteItem = async (db: DatabaseAdapter, id: number) => {
+export const deleteItem = async (db: Db, id: number) => {
   try {
     await db.run('DELETE FROM items WHERE "id" = ?;', [id]);
     return { success: true };
   } catch (error) {
-    return { success: false, ...mapDatabaseError(error, db.type) };
+    return { success: false, ...mapDatabaseError(error) };
   }
 };
 
-export const batchAddItem = async (db: DatabaseAdapter, data: Item[]) => {
+export const batchAddItem = async (db: Db, data: Item[]) => {
   const handle = handleItemEntity<Item>(db, 'items', itemFields);
   try {
-    await db.run('BEGIN');
     for (const row of data) {
       const finalItem = await resolveItemRelations(db, row);
       const result = await handle(finalItem);
       if (!result.success) {
-        try {
-          await db.run('ROLLBACK');
-        } catch {
-          throw new Error(`error.rollbackFailed`);
-        }
         return result;
       }
     }
-    await db.run('COMMIT');
     return { success: true };
   } catch (error) {
-    try {
-      await db.run('ROLLBACK');
-    } catch {
-      throw new Error(`error.rollbackFailed`);
-    }
-    return { success: false, ...mapDatabaseError(error, db.type) };
+    return { success: false, ...mapDatabaseError(error) };
   }
 };

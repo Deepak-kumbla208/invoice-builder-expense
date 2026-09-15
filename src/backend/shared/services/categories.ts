@@ -1,12 +1,12 @@
+import type { Db } from '../db/tx';
 import type { Category } from '../types/category';
-import type { DatabaseAdapter } from '../types/DatabaseAdapter';
 import type { FilterData } from '../types/invoiceFilter';
 import { getAllEntities, handleEntity } from '../utils/entitiesFunctions';
 import { mapDatabaseError } from '../utils/errorFunctions';
 
 const categoryFields: (keyof Category)[] = ['name', 'isArchived'];
 
-export const getAllCategories = async (db: DatabaseAdapter, filter?: FilterData[]) => {
+export const getAllCategories = async (db: Db, filter?: FilterData[]) => {
   const getAll = getAllEntities<Category>(db, 'categories', 'c', 'inv', {
     joins: `
         LEFT JOIN items it ON it."categoryId" = c."id"
@@ -25,7 +25,7 @@ export const getAllCategories = async (db: DatabaseAdapter, filter?: FilterData[
   return getAll(filter ?? []);
 };
 
-export const addCategory = async (db: DatabaseAdapter, data: Category) => {
+export const addCategory = async (db: Db, data: Category) => {
   const handle = handleEntity<Category>(db, 'categories', 'c', categoryFields, {
     joins: `
           LEFT JOIN items it ON it."categoryId" = c."id"
@@ -44,7 +44,7 @@ export const addCategory = async (db: DatabaseAdapter, data: Category) => {
   return handle(data);
 };
 
-export const updateCategory = async (db: DatabaseAdapter, data: Category) => {
+export const updateCategory = async (db: Db, data: Category) => {
   const handle = handleEntity<Category>(db, 'categories', 'c', categoryFields, {
     joins: `
           LEFT JOIN items it ON it."categoryId" = c."id"
@@ -63,16 +63,16 @@ export const updateCategory = async (db: DatabaseAdapter, data: Category) => {
   return handle(data, true);
 };
 
-export const deleteCategory = async (db: DatabaseAdapter, id: number) => {
+export const deleteCategory = async (db: Db, id: number) => {
   try {
     await db.run('DELETE FROM categories WHERE "id" = ?;', [id]);
     return { success: true };
   } catch (error) {
-    return { success: false, ...mapDatabaseError(error, db.type) };
+    return { success: false, ...mapDatabaseError(error) };
   }
 };
 
-export const batchAddCategory = async (db: DatabaseAdapter, data: Category[]) => {
+export const batchAddCategory = async (db: Db, data: Category[]) => {
   const handle = handleEntity<Category>(db, 'categories', 'c', categoryFields, {
     joins: `
           LEFT JOIN items it ON it."categoryId" = c."id"
@@ -89,26 +89,14 @@ export const batchAddCategory = async (db: DatabaseAdapter, data: Category[]) =>
         `
   });
   try {
-    await db.run('BEGIN');
     for (const row of data) {
       const result = await handle(row);
       if (!result.success) {
-        try {
-          await db.run('ROLLBACK');
-        } catch {
-          throw new Error(`error.rollbackFailed`);
-        }
         return result;
       }
     }
-    await db.run('COMMIT');
     return { success: true };
   } catch (error) {
-    try {
-      await db.run('ROLLBACK');
-    } catch {
-      throw new Error(`error.rollbackFailed`);
-    }
-    return { success: false, ...mapDatabaseError(error, db.type) };
+    return { success: false, ...mapDatabaseError(error) };
   }
 };

@@ -1,5 +1,5 @@
+import type { Db } from '../db/tx';
 import type { Business } from '../types/business';
-import type { DatabaseAdapter } from '../types/DatabaseAdapter';
 import type { EntityWithCounts } from '../types/entityWithCounts';
 import type { FilterData } from '../types/invoiceFilter';
 import type { Response } from '../types/response';
@@ -30,10 +30,7 @@ const businessFields: (keyof Business)[] = [
   'isArchived'
 ];
 
-export const getAllBusinesses = (
-  db: DatabaseAdapter,
-  filter?: FilterData[]
-): Promise<Response<(Business & EntityWithCounts)[]>> => {
+export const getAllBusinesses = (db: Db, filter?: FilterData[]): Promise<Response<(Business & EntityWithCounts)[]>> => {
   const getAll = getAllEntities<Business>(db, 'businesses', 't', 'i', {
     joins: `
       LEFT JOIN invoices i ON i."businessId" = t."id"
@@ -50,7 +47,7 @@ export const getAllBusinesses = (
   return getAll(filter ?? []);
 };
 
-export const addBusiness = (db: DatabaseAdapter, data: Business): Promise<Response<Business & EntityWithCounts>> => {
+export const addBusiness = (db: Db, data: Business): Promise<Response<Business & EntityWithCounts>> => {
   const handle = handleEntity<Business>(db, 'businesses', 'b', businessFields, {
     joins: `LEFT JOIN invoices i ON i."businessId" = b.id`,
     invoiceCountExpr: `
@@ -65,7 +62,7 @@ export const addBusiness = (db: DatabaseAdapter, data: Business): Promise<Respon
   return handle(data);
 };
 
-export const updateBusiness = (db: DatabaseAdapter, data: Business): Promise<Response<Business & EntityWithCounts>> => {
+export const updateBusiness = (db: Db, data: Business): Promise<Response<Business & EntityWithCounts>> => {
   const handle = handleEntity<Business>(db, 'businesses', 'b', businessFields, {
     joins: `LEFT JOIN invoices i ON i."businessId" = b."id"`,
     invoiceCountExpr: `
@@ -80,16 +77,16 @@ export const updateBusiness = (db: DatabaseAdapter, data: Business): Promise<Res
   return handle(data, true);
 };
 
-export const deleteBusiness = async (db: DatabaseAdapter, id: number) => {
+export const deleteBusiness = async (db: Db, id: number) => {
   try {
     await db.run('DELETE FROM businesses WHERE "id" = ?;', [id]);
     return { success: true };
   } catch (error) {
-    return { success: false, ...mapDatabaseError(error, db.type) };
+    return { success: false, ...mapDatabaseError(error) };
   }
 };
 
-export const batchAddBusiness = async (db: DatabaseAdapter, data: Business[]) => {
+export const batchAddBusiness = async (db: Db, data: Business[]) => {
   const handle = handleEntity<Business>(db, 'businesses', 'b', businessFields, {
     joins: `LEFT JOIN invoices i ON i."businessId" = b."id"`,
     invoiceCountExpr: `
@@ -102,26 +99,14 @@ export const batchAddBusiness = async (db: DatabaseAdapter, data: Business[]) =>
       `
   });
   try {
-    await db.run('BEGIN');
     for (const row of data) {
       const result = await handle(row);
       if (!result.success) {
-        try {
-          await db.run('ROLLBACK');
-        } catch {
-          throw new Error(`error.rollbackFailed`);
-        }
         return result;
       }
     }
-    await db.run('COMMIT');
     return { success: true };
   } catch (error) {
-    try {
-      await db.run('ROLLBACK');
-    } catch {
-      throw new Error(`error.rollbackFailed`);
-    }
-    return { success: false, ...mapDatabaseError(error, db.type) };
+    return { success: false, ...mapDatabaseError(error) };
   }
 };
