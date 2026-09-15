@@ -2,7 +2,7 @@
 
 | Phase | Plan | Status |
 |---|---|---|
-| 0 Foundation | `phase-0-foundation.md` | Not started |
+| 0 Foundation | `phase-0-foundation.md` | In progress (branch `phase-0-foundation`) |
 | 1 Access (auth, RBAC, RLS) | `phase-1-access.md` | Not started |
 | 2 Invoices (office, GST, numbering, credit notes) | `phase-2-invoices.md` | Not started |
 | 3 Expenses & reimbursements | `phase-3-expenses.md` | Not started |
@@ -24,9 +24,13 @@
 
 ## Current
 - **Active phase:** 0
-- **Next task:** 0.1 Run existing invoice tests on PostgreSQL
+- **Next task:** 0.2 Baseline schema
 - **Blockers:** none
 
 ## Session log
 <!-- newest first, ≤10 lines per session: date · tasks done · checks run/results · next · blockers -->
+- 2026-09-15 · 0.1 done: `docker-compose.dev.yml`, `pgTestDb` helper, invoices + layouts specs ported to PostgreSQL
+- Check: `vitest run src/backend` → 2 files, 10/10 pass on postgres-test; no PG errors logged; eslint/prettier clean
+- Plan deviations (see `phase-0-notes.md`): fixed 2 PG-only legacy bugs (empty `IN ()` in `getInvoices`; stale 3-col unique constraint in migration 24); layouts spec builds DB up to migration 27
+- Local setup: Docker Desktop must be running; `npm ci --ignore-scripts && npm rebuild sqlite3 esbuild` until 0.5
 - 2026-09-15 · Design, multi-agent review and plans written · no code changed · next: Phase 0 task 0.1

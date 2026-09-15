@@ -1,8 +1,5 @@
-import path from 'path';
-import sqlite3 from 'sqlite3';
-import { createSqliteAdapter } from '../../db/client';
-import { runMigrations } from '../../db/migrationRunner';
-import { initInitialData, initSchema } from '../../db/setup';
+// @vitest-environment node
+import { createPgTestDb, type PgTestDb } from '../../../__tests__/helpers/pgTestDb';
 import { InvoiceStatus } from '../../enums/invoiceStatus';
 import { InvoiceType } from '../../enums/invoiceType';
 import { Language } from '../../enums/language';
@@ -15,21 +12,12 @@ import type {
 } from '../../types/invoice';
 import { addInvoice, duplicateInvoice, getNextSequence, updateInvoice } from '../invoices';
 
-const createTestDatabase = async (): Promise<DatabaseAdapter> => {
-  const sqlite = new sqlite3.Database(':memory:');
-  const db = createSqliteAdapter(sqlite);
-  await initSchema(db);
-  await runMigrations(db, path.resolve(__dirname, '../../../../../dist-be/backend/migrations'));
-  await initInitialData(db);
-  return db;
-};
-
 const insertBusiness = async (db: DatabaseAdapter, name: string, shortName: string) => {
-  return db.run(`INSERT INTO businesses ("name", "shortName") VALUES (?, ?);`, [name, shortName], true);
+  return db.run(`INSERT INTO businesses ("name", "shortName") VALUES (?, ?)`, [name, shortName], true);
 };
 
 const insertClient = async (db: DatabaseAdapter, name: string, shortName: string) => {
-  return db.run(`INSERT INTO clients ("name", "shortName") VALUES (?, ?);`, [name, shortName], true);
+  return db.run(`INSERT INTO clients ("name", "shortName") VALUES (?, ?)`, [name, shortName], true);
 };
 
 const getCurrencyId = async (db: DatabaseAdapter, code: string) => {
@@ -130,18 +118,20 @@ const loadNextSequence = async (
     `SELECT "nextSequence" FROM invoice_sequences WHERE "businessId" = ? AND "clientId" = ? AND "invoiceType" = ?;`,
     [businessId, clientId, invoiceType]
   );
-  return row?.nextSequence;
+  return row ? Number(row.nextSequence) : undefined;
 };
 
 describe('invoice sequence handling', () => {
+  let testDb: PgTestDb;
   let db: DatabaseAdapter;
 
-  beforeEach(async () => {
-    db = await createTestDatabase();
+  beforeAll(async () => {
+    testDb = await createPgTestDb();
+    db = testDb.db;
   });
 
-  afterEach(async () => {
-    await db.close();
+  afterAll(async () => {
+    await testDb.drop();
   });
 
   it('creates a client-scoped sequence row on addInvoice when missing and advances sequentially', async () => {

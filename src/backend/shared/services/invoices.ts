@@ -736,10 +736,13 @@ const getInvoices = async (db: DatabaseAdapter, options: GetInvoicesOptions) => 
 
   const invoiceItemIds = invoiceItems.map(i => i.id) as number[];
   const placeholdersItems = invoiceItemIds.map(() => '?').join(', ');
-  const invoiceItemSnapshots = await db.all<InvoiceItemSnapshots>(
-    `SELECT sps.* FROM invoice_item_snapshots as sps WHERE "parentInvoiceItemId" IN (${placeholdersItems})`,
-    invoiceItemIds
-  );
+  const invoiceItemSnapshots =
+    invoiceItemIds.length > 0
+      ? await db.all<InvoiceItemSnapshots>(
+          `SELECT sps.* FROM invoice_item_snapshots as sps WHERE "parentInvoiceItemId" IN (${placeholdersItems})`,
+          invoiceItemIds
+        )
+      : [];
 
   return invoices.map(invoice => {
     const specificCustomization = invoiceCustomization.find(p => p.parentInvoiceId === invoice.id);

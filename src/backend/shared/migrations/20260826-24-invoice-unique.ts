@@ -9,6 +9,7 @@ export const up = async (db: DatabaseAdapter) => {
       await db.run(
         'ALTER TABLE invoices DROP CONSTRAINT IF EXISTS "invoices_businessId_invoiceFullNumber_clientId_key"'
       );
+      await db.run('ALTER TABLE invoices DROP CONSTRAINT IF EXISTS invoices_businessId_invoiceFullNumber_clientId_key');
       await db.run(
         `ALTER TABLE invoices
          ADD CONSTRAINT invoices_businessId_invoiceFullNumber_clientId_invoiceType_key
