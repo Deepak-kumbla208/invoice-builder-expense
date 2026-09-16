@@ -217,19 +217,19 @@ export const webApi = () => {
 
     checkForUpdates: () => Promise.resolve(),
     restartApp: () => {},
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
     onUpdateProgress: (_callback: (data: ProgressInfo) => void) => () => {
       console.warn('Not supported for WEB API');
     },
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
     onUpdateAvailable: (_callback: () => void) => () => {
       console.warn('Not supported for WEB API');
     },
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
     onUpdateNotAvailable: (_callback: () => void) => () => {
       console.warn('Not supported for WEB API');
     },
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
     onUpdateDownloaded: (_callback: (version: string) => void) => () => {
       console.warn('Not supported for WEB API');
     },

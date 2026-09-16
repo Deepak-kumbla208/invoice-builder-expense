@@ -44,3 +44,15 @@ Failures seen only on PostgreSQL while porting tests (task 0.1), and the minimum
 - `layouts.migration.spec.ts` no longer re-runs the layouts table migration (not re-runnable: `ADD COLUMN`); it asserts the migrated state and re-runs the seed twice for idempotency.
 - Local install: `npm ci --ignore-scripts && npm rebuild sqlite3 esbuild` (the `postinstall` Electron rebuild breaks `sqlite3` under Node; removed in 0.5).
 - Local dev: `DATABASE_URL` must be set by hand when running `npm run dev:webserver` until 0.6 adds `.env`/Docker wiring.
+
+## Task 0.4 deviations
+
+- **Controllers were already done in 0.3** (see above); 0.4 landed only the `main.ts` wiring, `migrate.ts` and the dependency changes.
+- **15 MB parser is mounted per route prefix, write methods only.** `LARGE_BODY_ROUTES` (`/api/invoices`, `/api/businesses`, `/api/presets`, `/api/styleProfiles`) each get a `express.json({ limit: '15mb' })` guard that defers to `next()` for non-`POST/PUT/PATCH`; the global `express.json({ limit: '1mb' })` runs after and body-parser skips a request whose body is already parsed. Prefix mounting also covers the sub-routes (`/api/invoices/duplicate`, `/api/presets/batch`, …).
+- **Error keys reuse existing i18n strings** rather than adding new ones to all 5 locales: `entity.too.large` → `error.fileTooLarge`, `entity.parse.failed` → `error.invalidFile`, everything else → `error.unknownError`. 5xx responses send a fixed `Internal server error` message (no stack, no upstream text); the log line is `[requestId] METHOD path status key: message` with no request body.
+- **`requestId` lives on `res.locals`**, not a `Request` augmentation, so no `.d.ts` module augmentation is needed for `tsconfig.webserver.json`.
+- **`cors` and `@types/cors` removed from `package.json`; `helmet` added.** 0.5's dependency list did not name `cors`, but nothing imports it once `main.ts` drops the middleware.
+- **`webserver/config.ts` trimmed** to `DEV_SERVER_URL`/`PORT`/`VERSION`; `FE_SERVER_URL` was only used by CORS and `DB_DIRECTORY` was a SQLite leftover.
+- **ESLint:** added `@typescript-eslint/no-unused-vars` with `argsIgnorePattern: '^_'` — Express detects an error handler by `fn.length === 4`, so the unused `_next` parameter has to stay. This made 4 `eslint-disable-next-line` directives in `renderer/shared/api/platformApi.ts` redundant; they were removed by `eslint --fix`.
+- **`migrate.ts`** resolves `MIGRATION_DATABASE_URL ?? DATABASE_URL` (the fallback 0.3 deferred) and `path.resolve(__dirname, '../shared/migrations')`. It is re-runnable (`No new migrations to apply` on the second run).
+- **Environment conflict found while running the 0.4 check:** host port 5432 is held by an unrelated `i-ticket-postgres-1` container, so `invoice-expense-postgres-1` came up unpublished and `localhost:5432` authenticates against the other project's database. The smoke test was run against a scratch `invoice_expense` database on the test instance (`localhost:5433`) instead. Nothing in the repo was changed for this; free port 5432 (or remap it in `docker-compose.dev.yml`) before using the dev database.

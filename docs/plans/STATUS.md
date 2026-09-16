@@ -26,12 +26,17 @@
 ## Current
 
 - **Active phase:** 0
-- **Next task:** 0.4 Server wiring (CORS/body limits/helmet/error handler/`migrate.ts`; controllers' `withTx` wiring is already done, pulled forward in 0.3)
-- **Blockers:** none
+- **Next task:** 0.5 Remove Electron and SQLite from the repo
+- **Blockers:** none (note: host port 5432 is held by an unrelated `i-ticket-postgres-1` container, so the dev database is unreachable until that port is freed or remapped)
 
 ## Session log
 
 <!-- newest first, ≤10 lines per session: date · tasks done · checks run/results · next · blockers -->
+
+- 2026-09-16 · 0.4 done: `main.ts` rewired — CORS removed, `helmet()`, `trust proxy 1`, per-request `requestId`, `express.json` 1mb global + 15mb on write routes of `invoices`/`businesses`/`presets`/`styleProfiles`, central error handler `{ success:false, key, message }`; new `webserver/migrate.ts` + `npm run migrate` (`MIGRATION_DATABASE_URL ?? DATABASE_URL`); `cors`/`@types/cors` dropped, `helmet` added
+- 0.4 check: `tsc -p tsconfig.webserver.json` clean; `eslint .` clean; `vitest run src/backend` → 4 files, 14/14 pass; `npm run migrate` applied `0001-baseline.sql` then reported no-op on re-run; server up → `/api/health` `{ok:true}`, `/api/invoices` `{"success":true,"data":[]}`, `/api/currencies` seeded rows, helmet headers present, no CORS header
+- 0.4 body limits verified: 2MB→`/api/categories` 413 `error.fileTooLarge`; 2MB→`/api/invoices` parsed (500 from the service, not 413); 16MB→`/api/invoices` 413; malformed JSON 400 `error.invalidFile`; logs show `[requestId] METHOD path status key` with no bodies
+- 0.4 env: host 5432 belongs to another project's container, so the smoke test ran against a scratch DB on the test instance (5433). Details in `phase-0-notes.md`
 
 - 2026-09-15 · 0.3 done: `db/pool.ts` + `db/tx.ts` (`Db`, `withTx`, `DbUsedOutsideTransaction`); baseline booleans converted to real `BOOLEAN`; all 11 services + `layouts`/`settings` moved off `DatabaseAdapter`/dialect branches/`BEGIN·COMMIT·ROLLBACK`; `getInvoices`/`presets.getPresets` id/type interpolation and all of `filterFunctions.ts` parameterized
 - 0.3 check: `tsc -p tsconfig.webserver.json` clean; `eslint src/backend` clean; `vitest run src/backend` → 4 files, 14/14 pass (added `db/__tests__/tx.spec.ts`); manual smoke test of the running server (health, filtered list, create) green
