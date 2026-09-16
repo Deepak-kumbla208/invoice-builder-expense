@@ -5,3 +5,4 @@ public/**
 **/bitbucket-pipelines.yml
 *.yml
 .github/**
+Caddyfile

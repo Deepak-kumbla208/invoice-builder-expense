@@ -5,8 +5,7 @@ import { APP_CONFIG } from './config';
 import { initControllers } from './controllers';
 
 const port = Number(process.env.PORT) || Number(APP_CONFIG.PORT);
-const server = process.env.DEV_SERVER_URL || APP_CONFIG.DEV_SERVER_URL;
-const host = process.env.NODE_ENV === 'docker' ? 'localhost' : server;
+const host = process.env.HOST || APP_CONFIG.HOST;
 const version = APP_CONFIG.VERSION;
 
 const LARGE_BODY_ROUTES = ['/api/invoices', '/api/businesses', '/api/presets', '/api/styleProfiles'];
@@ -61,8 +60,8 @@ const main = async () => {
     });
   });
 
-  app.listen(port, server, () => {
-    console.log(`Server listening at http://${host}:${port}`);
+  app.listen(port, host, () => {
+    console.log(`Server listening on ${host}:${port}`);
   });
 };
 

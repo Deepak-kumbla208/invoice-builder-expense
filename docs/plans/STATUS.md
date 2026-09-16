@@ -26,12 +26,18 @@
 ## Current
 
 - **Active phase:** 0
-- **Next task:** 0.6 Docker and CI
+- **Next task:** 0.7 Regression check (phase gate)
 - **Blockers:** none (note: host port 5432 is held by an unrelated `i-ticket-postgres-1` container, so the dev database is unreachable until that port is freed or remapped)
 
 ## Session log
 
 <!-- newest first, ≤10 lines per session: date · tasks done · checks run/results · next · blockers -->
+
+- 2026-09-16 · 0.6 done: one Dockerfile with `runner` (API) and `web` (Caddy + built SPA) targets; `docker-compose.yml` = `db` + one-shot `migrate` + `app` + `caddy`, only Caddy publishes 80/443; `Caddyfile` with `{$APP_DOMAIN}`, SPA fallback, `/api/*` proxy and D16's 20 MB limit; `.env.example`; CI on Node 22 with a `postgres:17` service; `docker-publish.yml` builds both targets, tags/dispatch only
+- 0.6 check: `docker compose up -d --build` → db healthy → migrate applied `0001-baseline.sql` → app healthy → caddy; `https://localhost` serves the SPA over Caddy's internal CA, `/invoices` renders the list through the SPA fallback, `/api/health`, `/api/version`, `/api/invoices`, `/api/currencies` all answer through the proxy
+- 0.6 check: `prettier --check .` → clean (the 11 long-standing files formatted), `lint`, `typecheck`, `test` (8 files, 37/37), `build`, `test:e2e` (1/1) all green
+- 0.6 fixed a loop introduced in 0.5: `/invoices` re-fetched settings/presets/invoices forever because `useAsync`'s `execute` depended on `t` and `App.tsx` called `i18n.changeLanguage` on every settings result. Callbacks moved to refs, `changeLanguage` now guarded. Verified in a browser: 5 API calls total, no console errors
+- 0.6 also: `.sql` migrations are copied into `dist-be` by `scripts/copy-webserver-assets.js` (a built image had none); `DEV_SERVER_URL` renamed to `HOST`. Details in `phase-0-notes.md`
 
 - 2026-09-16 · 0.5 done: Electron, preload, SQLite and the database-chooser flow deleted (60 files); `getApi()` is `webApi()` only, `isWebMode`/`electronAPI`/`global.d.ts` gone; `App.tsx` renders `AppLayout` directly; receipt-printing and updater UI removed; `package.json` scripts/deps/metadata reworked (`test` = `vitest run`, new `typecheck`, no `docker:*`/`package`/`release:*`/`postinstall`)
 - 0.5 check: `npm ci` (no `--ignore-scripts` needed any more) → `npm run typecheck` → `npm run lint` → `npm test` (8 files, 37/37) → `npm run build` all green; `grep -rniE "electron|sqlite" src package.json` returns only the UBL `<cbc:ElectronicMail>` tag

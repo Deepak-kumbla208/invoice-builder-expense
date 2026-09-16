@@ -51,7 +51,7 @@ export const App: FC = () => {
   useEffect(() => {
     if (settings) {
       dispatch(setSettings(settings));
-      i18n.changeLanguage(settings.language);
+      if (i18n.language !== settings.language) i18n.changeLanguage(settings.language);
       localStorage.setItem('lastUsedLanguage', settings.language);
     }
   }, [settings, dispatch]);

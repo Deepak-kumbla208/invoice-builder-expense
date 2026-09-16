@@ -13,10 +13,12 @@
 ## Tasks
 
 ### 2.1 Characterisation tests
+
 - Extend `services/__tests__/invoices.spec.ts` to pin the current behaviour you intend to keep: item and discount maths, surcharge, shipping, partial payments, status transitions (unpaid/partially/paid/closed), duplicate content (minus number), quote → invoice content, and snapshot contents.
 - Mark tests that will intentionally change (numbering, snapshots from browser) as `it.todo` with a note referencing D17.
 
 ### 2.2 Shared tax module
+
 - `src/backend/shared/tax/` holds pure TypeScript with no Node or DOM imports. Add a path alias `@tax` in `tsconfig.app.json`, `tsconfig.webserver.json` and `vite.config.ts`.
   - `computeInvoice({ lines, pricesIncludeTax, supplyType, discount, surcharge, shipping, exchangeRate })` returns per-line `{ taxable, cgst, sgst, igst }`, `hsnSummary` and totals in **integer paisa** plus INR totals. Rounding is half-up per line and per head.
   - `deriveSupplyType({ officeState, pos, clientIsSez, exportWithLut })`.
@@ -30,6 +32,7 @@
 - Port the discount/surcharge/shipping maths from `src/renderer/shared/utils/invoiceFunctions.ts` (lines ~33–43, 153–210). The characterisation tests from 2.1 must still pass with the same results in paisa.
 
 ### 2.3 Migration `0004-invoice-scoping.sql`
+
 - `clients` gains `business_id NOT NULL`, `gstin`, `state_code`, `country_code DEFAULT 'IN'`, `is_sez`, `uuid`, and `UNIQUE(id, business_id)`.
 - `items` gains `business_id`, `hsn_sac` and `gst_rate NUMERIC(5,2)`; legacy `taxRate`/`taxType` are dropped.
 - `banks` gains `business_id`. New table `office_bank_accounts`. `presets` gains `business_id`.
@@ -53,6 +56,7 @@
 - Update `legacy-columns.json` `INTENTIONAL_DROPS`, then delete that fixture and test at the end of this phase.
 
 ### 2.4 Invoice service changes (`services/invoices.ts` and new `services/invoiceLifecycle.ts`)
+
 - `addInvoice` / `updateInvoice`:
   - Draft only. Require `office_id`; the company follows from the office.
   - Validate the client, items, bank and preset belong to the same company (service check).
@@ -73,6 +77,7 @@
   - Lock the sequence row `FOR UPDATE` (upsert with `ON CONFLICT`) and assign the number.
   - **Rebuild all snapshots from the DB** (business, office, client, bank, currency, items, style profile, layout).
   - Recompute totals, set `issued_by`/`issued_at`, and write the audit event.
+
 - `cancelInvoice(id, reason)`: issued with **no payments** (A4); audited.
 - `createCreditNote(originalId, lines)`:
   - The original must be issued, not cancelled.
@@ -84,9 +89,11 @@
 - `deleteInvoice`: drafts only.
 
 ### 2.5 Controllers
+
 - New routes from design §8 (issue, cancel, credit-notes, payments, paged list, detail), with zod schemas and `requirePermission`. Every mutation writes an audit event with before/after (no binaries).
 
 ### 2.6 Company-scoped setup entities
+
 - Clients, items, banks and presets services, controllers and pages: filter by the selected company and set `business_id` on create.
 - Client form gains GSTIN (format check), state, country and SEZ flag. Item form gains HSN/SAC and GST rate (select from `gst_rates`).
 - Office page gains bank account selection.
@@ -94,6 +101,7 @@
 - Admin page: GST rates.
 
 ### 2.7 Invoice UI (reuse `pages/invoices/Form*`, `Preview/*`)
+
 - **Form:**
   - Office picker (required when "All my offices" is selected; pre-filled for single-office users).
   - Place of supply (defaults from the client; editable, with a hint). Supply type is shown read-only in plain words, and the LUT-vs-IGST choice appears only for export/SEZ.
@@ -110,6 +118,7 @@
 - Remove the `aggregateInvoicesByCurrency` use in the list and totals (reports are handled in Phase 5).
 
 ### 2.8 Tests (phase gate)
+
 - `@tax` unit suite (2.2). **Preview equals stored totals:** render the form's computed totals and compare with the service-stored totals for 10 fixture invoices.
 - **Lifecycle:**
   - draft has no number; issue assigns one; issue on 31 Mar vs 1 Apr gives different FYs
@@ -128,6 +137,7 @@
 - **E2E:** draft → issue → PDF download (numbered, no watermark) → partial payment → credit note → balance; export invoice in USD with LUT shows the LUT reference and zero tax.
 
 ## Exit criteria
+
 - [ ] Phase gate green
 - [ ] Characterisation tests from 2.1 pass, except the intentional `todo`s, which are now replaced by new-behaviour tests
 - [ ] No remaining reference to legacy tax fields, manual numbering, or `invoice_sequences.businessId/clientId`

@@ -78,17 +78,40 @@ npm run dev                                      # vite :5173 + API :3000
 | `npm run test:e2e`  | Playwright end-to-end tests                        |
 | `npm run build`     | Production `dist-fe` and `dist-be`                 |
 
+## 🐳 Running the stack
+
+`docker compose up` runs four services: `db` (PostgreSQL 17, internal network only), a one-shot
+`migrate`, `app` (the API), and `caddy`, which serves the built SPA, terminates TLS and proxies
+`/api/*` to the API. Only Caddy publishes ports (80 and 443).
+
+```bash
+cp .env.example .env     # set APP_DOMAIN and POSTGRES_PASSWORD
+docker compose up -d --build
+```
+
+With `APP_DOMAIN=localhost` Caddy issues a certificate from its own internal CA, so
+`https://localhost` works immediately; the browser warns about the CA unless you trust it. For a
+real deployment set `APP_DOMAIN` to the public hostname and Caddy obtains a Let's Encrypt
+certificate on first start.
+
+Migrations run as their own service before the API starts — `app` waits for `migrate` to complete
+successfully. To apply migrations without restarting the API, run `docker compose run --rm migrate`.
+
 ### ⚙️ Environment variables
 
 | Variable                 | Used by   | Meaning                                                                          |
 | ------------------------ | --------- | -------------------------------------------------------------------------------- |
 | `DATABASE_URL`           | API       | PostgreSQL connection string for the application user                            |
 | `MIGRATION_DATABASE_URL` | `migrate` | Connection string for migrations; falls back to `DATABASE_URL`                   |
+| `HOST`                   | API       | Bind address (default `127.0.0.1`; the image sets `0.0.0.0`)                     |
 | `PORT`                   | API       | API port (default `3000`)                                                        |
+| `APP_DOMAIN`             | Caddy     | Hostname Caddy serves and requests a certificate for                             |
+| `POSTGRES_PASSWORD`      | `db`      | Password for the PostgreSQL superuser inside the container                       |
 | `TEST_DATABASE_URL`      | tests     | Test PostgreSQL (default `postgres://postgres:postgres@localhost:5433/postgres`) |
-| `VITE_API_URL`           | renderer  | API origin; defaults to the page origin when the API is same-origin              |
+| `API_PROXY_TARGET`       | dev only  | Where the Vite dev server proxies `/api/*` (default `http://127.0.0.1:3000`)     |
+| `VITE_API_URL`           | renderer  | API origin, for split-origin deployments; defaults to the page origin            |
 
-### 🤝 Contributing
+## 🤝 Contributing
 
 Read [CLAUDE.md](CLAUDE.md) first, then [docs/plans/STATUS.md](docs/plans/STATUS.md) for the active
 phase. [AGENTS.md](AGENTS.md) describes the agent-assisted workflow, and
