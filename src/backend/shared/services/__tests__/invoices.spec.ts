@@ -400,4 +400,46 @@ describe('invoice sequence handling', () => {
       formattedSequence: '000011'
     });
   });
+
+  it('accepts payments carrying a client-generated id that is out of range for int4', async () => {
+    const businessId = await insertBusiness(testDb, 'Business H', 'BH');
+    const clientId = await insertClient(testDb, 'Client H', 'CH');
+    const currencyId = await getCurrencyId(testDb, 'USD');
+
+    const clientSideId = 1789564960373;
+    const payload = createInvoicePayload(businessId, clientId, currencyId, '1');
+    payload.invoiceBusinessSnapshot.businessShortName = 'BH';
+    payload.invoicePayments = [
+      {
+        id: clientSideId,
+        paidAt: new Date().toISOString(),
+        paymentMethod: 'Cash',
+        amountCents: '4000'
+      } as NewInvoicePayload['invoicePayments'][number]
+    ];
+
+    const added = await testDb.withTx(db => addInvoice(db, payload));
+    expect(added.success).toBe(true);
+
+    const stored = added.data as Invoice;
+    expect(stored.invoicePayments).toHaveLength(1);
+    expect(stored.invoicePayments?.[0].id).not.toBe(clientSideId);
+
+    const updated = await testDb.withTx(db =>
+      updateInvoice(db, {
+        ...stored,
+        invoicePayments: [
+          ...(stored.invoicePayments ?? []),
+          {
+            id: clientSideId + 1,
+            paidAt: new Date().toISOString(),
+            paymentMethod: 'Cash',
+            amountCents: '1000'
+          } as NewInvoicePayload['invoicePayments'][number]
+        ]
+      })
+    );
+    expect(updated.success).toBe(true);
+    expect((updated.data as Invoice).invoicePayments).toHaveLength(2);
+  });
 });

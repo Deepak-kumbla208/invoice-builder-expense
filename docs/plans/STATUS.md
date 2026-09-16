@@ -1,14 +1,14 @@
 # Implementation Status
 
-| Phase                                             | Plan                    | Status                                    |
-| ------------------------------------------------- | ----------------------- | ----------------------------------------- |
-| 0 Foundation                                      | `phase-0-foundation.md` | In progress (branch `phase-0-foundation`) |
-| 1 Access (auth, RBAC, RLS)                        | `phase-1-access.md`     | Not started                               |
-| 2 Invoices (office, GST, numbering, credit notes) | `phase-2-invoices.md`   | Not started                               |
-| 3 Expenses & reimbursements                       | `phase-3-expenses.md`   | Not started                               |
-| 4 UX (dashboard, switcher, ageing, responsive)    | `phase-4-ux.md`         | Not started                               |
-| 5 Reports & exports                               | `phase-5-reports.md`    | Not started                               |
-| 6 Hardening & ops                                 | `phase-6-hardening.md`  | Not started                               |
+| Phase                                             | Plan                    | Status                                 |
+| ------------------------------------------------- | ----------------------- | -------------------------------------- |
+| 0 Foundation                                      | `phase-0-foundation.md` | **Done** (branch `phase-0-foundation`) |
+| 1 Access (auth, RBAC, RLS)                        | `phase-1-access.md`     | Not started                            |
+| 2 Invoices (office, GST, numbering, credit notes) | `phase-2-invoices.md`   | Not started                            |
+| 3 Expenses & reimbursements                       | `phase-3-expenses.md`   | Not started                            |
+| 4 UX (dashboard, switcher, ageing, responsive)    | `phase-4-ux.md`         | Not started                            |
+| 5 Reports & exports                               | `phase-5-reports.md`    | Not started                            |
+| 6 Hardening & ops                                 | `phase-6-hardening.md`  | Not started                            |
 
 ## User sign-off (design §3a)
 
@@ -25,13 +25,33 @@
 
 ## Current
 
-- **Active phase:** 0
-- **Next task:** 0.7 Regression check (phase gate)
+- **Active phase:** 1 (not started)
+- **Next task:** 1.1, per `docs/plans/phase-1-access.md`
 - **Blockers:** none (note: host port 5432 is held by an unrelated `i-ticket-postgres-1` container, so the dev database is unreachable until that port is freed or remapped)
+
+### Phase 0 gate (2026-09-16)
+
+| Check                    | Command                        | Result                                                |
+| ------------------------ | ------------------------------ | ----------------------------------------------------- |
+| Formatting               | `npx prettier --check .`       | clean                                                 |
+| Lint                     | `npm run lint`                 | clean                                                 |
+| Types                    | `npm run typecheck`            | clean (3 tsconfigs)                                   |
+| Unit + integration       | `npm test`                     | 8 files, 38/38                                        |
+| Build                    | `npm run build`                | `dist-fe` + `dist-be` (migrations copied)             |
+| Invoice regression e2e   | `npm run test:e2e`             | 2/2, PDF downloaded, numbers `1` then `2`             |
+| Docker stack             | `docker compose up -d --build` | `https://localhost` serves the SPA and the API        |
+| Responsive 375 / 1280 px | manual                         | list, form and preview render, no overflow, no errors |
+
+New feature tests and RLS/IDOR/permission tests do not apply to Phase 0.
 
 ## Session log
 
 <!-- newest first, ≤10 lines per session: date · tasks done · checks run/results · next · blockers -->
+
+- 2026-09-16 · 0.7 done, **Phase 0 complete**: `e2e/invoice-regression.spec.ts` drives the whole flow through the UI — company, client, currency, bank and item, then an invoice with 2 lines, a fixed discount and a partial payment, an edit re-read from the list, a PDF preview and download, and a duplicate; it asserts the numbers end up `['1','2']`
+- 0.7 check: prettier/lint/typecheck clean, `npm test` 8 files 38/38, `npm run build` green, `npm run test:e2e` 2/2 (stable over 3 consecutive runs), Docker stack green, 375 px and 1280 px render with no overflow and no console errors
+- 0.7 bug fixed: payments carry a client-generated `Date.now()` id, and `processPayments` compared it to an `integer` column, so **every invoice saved with a payment failed on PostgreSQL**. Both comparison sites now cast to `bigint`; new spec case fails without the fix
+- 0.7 known upstream behaviour, not fixed: `Form.tsx` debounces the form→page handoff by 250 ms, so a Save fired inside that window persists the previous state. Documented in `phase-0-notes.md`; belongs to Phase 4 UX
 
 - 2026-09-16 · 0.6 done: one Dockerfile with `runner` (API) and `web` (Caddy + built SPA) targets; `docker-compose.yml` = `db` + one-shot `migrate` + `app` + `caddy`, only Caddy publishes 80/443; `Caddyfile` with `{$APP_DOMAIN}`, SPA fallback, `/api/*` proxy and D16's 20 MB limit; `.env.example`; CI on Node 22 with a `postgres:17` service; `docker-publish.yml` builds both targets, tags/dispatch only
 - 0.6 check: `docker compose up -d --build` → db healthy → migrate applied `0001-baseline.sql` → app healthy → caddy; `https://localhost` serves the SPA over Caddy's internal CA, `/invoices` renders the list through the SPA fallback, `/api/health`, `/api/version`, `/api/invoices`, `/api/currencies` all answer through the proxy

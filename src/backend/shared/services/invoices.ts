@@ -363,7 +363,7 @@ const processPayments = async (
 ) => {
   for (const payment of payments ?? []) {
     if (payment.id) {
-      const existing = await db.get(`SELECT "id" FROM invoice_payments WHERE "id" = ?`, [payment.id]);
+      const existing = await db.get(`SELECT "id" FROM invoice_payments WHERE "id" = ?::bigint`, [payment.id]);
       if (existing) {
         const r = await handlers.handleInvoicePayments({ ...payment, parentInvoiceId } as InvoicePayment, true);
         if (!r.success) {
@@ -1124,7 +1124,9 @@ export const updateInvoice = async (db: Db, data: Invoice) => {
     const ids = (data.invoicePayments ?? []).map(p => p.id).filter(Boolean);
     if (ids.length > 0) {
       await db.run(
-        `DELETE FROM invoice_payments WHERE "parentInvoiceId" = ? AND "id" NOT IN (${ids.map(() => '?').join(',')})`,
+        `DELETE FROM invoice_payments WHERE "parentInvoiceId" = ? AND "id" NOT IN (${ids
+          .map(() => '?::bigint')
+          .join(',')})`,
         [data.id, ...ids]
       );
     } else {
