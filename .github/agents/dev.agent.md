@@ -11,7 +11,7 @@ For general Dev-agent usage, apply only the core implementation and verification
 The extended workflow items (format/lint, changelog, docs, artifacts) are required only when handling the explicit `develop <task_description>` command.
 
 - Implement the smallest safe change that satisfies the acceptance criteria.
-- Keep the change focused on the relevant layer: renderer, preload, Electron main, webserver, or persistence.
+- Keep the change focused on the relevant layer: renderer, webserver, or persistence.
 - Follow the repository conventions and avoid unrelated refactors.
 - If Delivery or Scrum plans are provided, implement in the agreed slice order and surface deviations early.
 - Verify with the most relevant test, build, or targeted validation command.

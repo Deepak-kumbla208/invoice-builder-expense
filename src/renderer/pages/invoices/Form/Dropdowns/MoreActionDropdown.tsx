@@ -3,7 +3,6 @@ import CodeIcon from '@mui/icons-material/Code';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FileCopyIcon from '@mui/icons-material/FileCopy';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
-import PrintIcon from '@mui/icons-material/Print';
 import {
   Box,
   ListItem,
@@ -18,7 +17,6 @@ import {
 } from '@mui/material';
 import { memo, type FC } from 'react';
 import { useTranslation } from 'react-i18next';
-import { isWebMode } from '../../../../shared/api/restApi';
 import { PageHeader } from '../../../../shared/components/layout/pageHeader/PageHeader';
 import { InvoiceType } from '../../../../shared/enums/invoiceType';
 import { useAppSelector } from '../../../../state/configureStore';
@@ -35,7 +33,6 @@ interface Props {
   onDelete?: () => void;
   onDuplicate?: () => void;
   onMakeInvoice?: () => void;
-  onPrintReceipt?: () => void;
   showDelete?: boolean;
   showDuplicate?: boolean;
   showMakeInvoice?: boolean;
@@ -52,7 +49,6 @@ const MoreActionDropdownComponent: FC<Props> = ({
   onClose,
   onOpen,
   onExportPDF,
-  onPrintReceipt,
   onExportPDFUBL,
   onExportUBLXML,
   onExportXRechnungXML,
@@ -160,39 +156,6 @@ const MoreActionDropdownComponent: FC<Props> = ({
                 />
               </ListItem>
             </ListItemButton>
-            {!isWebMode() && storeSettings?.receiptPrintingOn && type === InvoiceType.invoice && (
-              <ListItemButton
-                onClick={onPrintReceipt}
-                sx={{
-                  width: '100%',
-                  borderRadius: 1,
-                  display: 'flex',
-                  justifyContent: 'start',
-                  alignItems: 'start',
-                  flexDirection: 'column'
-                }}
-              >
-                <ListItem sx={{ p: 0 }}>
-                  <ListItemIcon sx={{ minWidth: 'auto', mr: 1 }}>
-                    <PrintIcon color="primary" />
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={
-                      <Typography
-                        component="div"
-                        variant="body1"
-                        sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}
-                      >
-                        {t('common.printReceipt')}
-                      </Typography>
-                    }
-                    disableTypography
-                    sx={{ m: 0 }}
-                    slotProps={{ primary: { sx: { fontWeight: 600, m: 0 } } }}
-                  />
-                </ListItem>
-              </ListItemButton>
-            )}
             {storeSettings?.ublON && type === InvoiceType.invoice && (
               <>
                 <Tooltip title={t('common.tooltipPDFXML')}>

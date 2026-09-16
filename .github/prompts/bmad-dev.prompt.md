@@ -30,6 +30,6 @@ Act as the developer implementing the change.
 12. Summarize what changed, what was verified, and any residual risk.
 
 ## Repository context
-- This repository contains Electron main, preload, renderer, webserver, and persistence layers.
+- This repository contains renderer, webserver, and persistence layers.
 - Avoid cross-cutting refactors unless explicitly requested.
 - If data persistence or schema changes are involved, consider migration impact.

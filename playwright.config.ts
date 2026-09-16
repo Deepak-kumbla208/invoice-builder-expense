@@ -14,14 +14,14 @@ export default defineConfig({
     {
       command: 'npm run dev:webserver',
       url: 'http://127.0.0.1:3013/api/health',
-      env: { PORT: '3013', FE_SERVER_URL: 'http://127.0.0.1:5183' },
+      env: { PORT: '3013' },
       reuseExistingServer: true,
       timeout: 120_000
     },
     {
       command: 'npm run dev:react -- --host 127.0.0.1 --port 5183',
       url: 'http://127.0.0.1:5183',
-      env: { VITE_API_URL: 'http://127.0.0.1:3013' },
+      env: { API_PROXY_TARGET: 'http://127.0.0.1:3013' },
       reuseExistingServer: true,
       timeout: 120_000
     }

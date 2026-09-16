@@ -325,7 +325,6 @@ const getScopedNextSequence = async (
 };
 
 const processItems = async (
-  db: Db,
   handlers: {
     handleInvoiceItems: (data: InvoiceItem) => Promise<Response<number>>;
     handleInvoiceItemSnapshots: (data: InvoiceItemSnapshots) => Promise<Response<number>>;
@@ -383,7 +382,6 @@ const processPayments = async (
 };
 
 const processAttachments = async (
-  db: Db,
   handlers: { handleAttachments: (data: InvoiceAttachment) => Promise<Response<number>> },
   parentInvoiceId: number,
   attachments?: InvoiceAttachment[] | null
@@ -952,7 +950,6 @@ export const addInvoice = async (db: Db, data: Invoice) => {
     }
 
     const itemsResult = await processItems(
-      db,
       { handleInvoiceItems, handleInvoiceItemSnapshots },
       newId,
       data.invoiceItems
@@ -966,7 +963,7 @@ export const addInvoice = async (db: Db, data: Invoice) => {
       return { success: false, key: paymentsResult.key, message: paymentsResult.message };
     }
 
-    const attachmentsResult = await processAttachments(db, { handleAttachments }, newId, data.invoiceAttachments);
+    const attachmentsResult = await processAttachments({ handleAttachments }, newId, data.invoiceAttachments);
     if (!attachmentsResult.success) {
       return { success: false, key: attachmentsResult.key, message: attachmentsResult.message };
     }
@@ -1116,7 +1113,6 @@ export const updateInvoice = async (db: Db, data: Invoice) => {
     await db.run('DELETE FROM invoice_items WHERE "parentInvoiceId" = ?;', [data.id]);
 
     const itemsResult = await processItems(
-      db,
       { handleInvoiceItems, handleInvoiceItemSnapshots },
       data.id,
       data.invoiceItems
@@ -1141,7 +1137,7 @@ export const updateInvoice = async (db: Db, data: Invoice) => {
     }
 
     await db.run('DELETE FROM attachments WHERE "parentInvoiceId" = ?;', [data.id]);
-    const attachmentsResult = await processAttachments(db, { handleAttachments }, data.id, data.invoiceAttachments);
+    const attachmentsResult = await processAttachments({ handleAttachments }, data.id, data.invoiceAttachments);
     if (!attachmentsResult.success) {
       return { success: false, key: attachmentsResult.key, message: attachmentsResult.message };
     }

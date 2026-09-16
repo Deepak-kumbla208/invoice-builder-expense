@@ -26,12 +26,17 @@
 ## Current
 
 - **Active phase:** 0
-- **Next task:** 0.5 Remove Electron and SQLite from the repo
+- **Next task:** 0.6 Docker and CI
 - **Blockers:** none (note: host port 5432 is held by an unrelated `i-ticket-postgres-1` container, so the dev database is unreachable until that port is freed or remapped)
 
 ## Session log
 
 <!-- newest first, ≤10 lines per session: date · tasks done · checks run/results · next · blockers -->
+
+- 2026-09-16 · 0.5 done: Electron, preload, SQLite and the database-chooser flow deleted (60 files); `getApi()` is `webApi()` only, `isWebMode`/`electronAPI`/`global.d.ts` gone; `App.tsx` renders `AppLayout` directly; receipt-printing and updater UI removed; `package.json` scripts/deps/metadata reworked (`test` = `vitest run`, new `typecheck`, no `docker:*`/`package`/`release:*`/`postinstall`)
+- 0.5 check: `npm ci` (no `--ignore-scripts` needed any more) → `npm run typecheck` → `npm run lint` → `npm test` (8 files, 37/37) → `npm run build` all green; `grep -rniE "electron|sqlite" src package.json` returns only the UBL `<cbc:ElectronicMail>` tag
+- 0.5 also: Vite now proxies `/api/*` in dev (0.4 removed CORS and dev is cross-origin — the e2e spec caught it), `base` `./` → `/`, `e2e/v2-layout.spec.ts` rewritten for web mode and passing, 4 pre-existing type errors fixed (incl. a real preset-response decoding bug), 21 orphaned i18n keys pruned in 5 locales, README + agent docs rewritten
+- 0.5 note: Sidebar logout removed with the database chooser — Phase 1 re-adds it with real authentication. Details in `phase-0-notes.md`
 
 - 2026-09-16 · 0.4 done: `main.ts` rewired — CORS removed, `helmet()`, `trust proxy 1`, per-request `requestId`, `express.json` 1mb global + 15mb on write routes of `invoices`/`businesses`/`presets`/`styleProfiles`, central error handler `{ success:false, key, message }`; new `webserver/migrate.ts` + `npm run migrate` (`MIGRATION_DATABASE_URL ?? DATABASE_URL`); `cors`/`@types/cors` dropped, `helmet` added
 - 0.4 check: `tsc -p tsconfig.webserver.json` clean; `eslint .` clean; `vitest run src/backend` → 4 files, 14/14 pass; `npm run migrate` applied `0001-baseline.sql` then reported no-op on re-run; server up → `/api/health` `{ok:true}`, `/api/invoices` `{"success":true,"data":[]}`, `/api/currencies` seeded rows, helmet headers present, no CORS header

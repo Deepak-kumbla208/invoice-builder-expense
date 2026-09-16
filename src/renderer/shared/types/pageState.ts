@@ -3,7 +3,6 @@ import type { ToastMeta } from './toastMeta';
 
 export interface PageState {
   isLoading: boolean;
-  dbReady: boolean;
   toasts: ToastMeta[];
   settings?: Settings;
   categoryOptions?: Array<{ label: string; value: number }>;
@@ -11,7 +10,5 @@ export interface PageState {
   clientSnapshotOptions?: Array<{ label: string; value: string }>;
   businessSnapshotOptions?: Array<{ label: string; value: string }>;
   version?: string;
-  newVersion?: string;
-  updateMessage?: string;
   isAllowedToLeave: boolean;
 }

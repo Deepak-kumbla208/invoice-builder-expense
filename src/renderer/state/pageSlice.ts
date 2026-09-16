@@ -10,7 +10,6 @@ import type { RootState } from './configureStore';
 
 const initialState: PageState = {
   isLoading: false,
-  dbReady: false,
   toasts: [],
   settings: undefined,
   categoryOptions: [],
@@ -18,8 +17,6 @@ const initialState: PageState = {
   clientSnapshotOptions: [],
   businessSnapshotOptions: [],
   version: undefined,
-  updateMessage: undefined,
-  newVersion: undefined,
   isAllowedToLeave: true
 };
 
@@ -42,25 +39,8 @@ export const pageSlice = createSlice({
     setVersion: (state, action: PayloadAction<string>) => {
       state.version = action.payload;
     },
-    setNewVersion: (state, action: PayloadAction<string | undefined>) => {
-      state.newVersion = action.payload;
-    },
     setAllowed: (state, action: PayloadAction<boolean>) => {
       state.isAllowedToLeave = action.payload;
-    },
-    setDbReady: (state, action: PayloadAction<boolean>) => {
-      state.dbReady = action.payload;
-    },
-    logout: state => {
-      state.dbReady = false;
-      state.settings = undefined;
-      state.categoryOptions = [];
-      state.unitOptions = [];
-      state.clientSnapshotOptions = [];
-      state.businessSnapshotOptions = [];
-    },
-    setUpdateMessage: (state, action: PayloadAction<string | undefined>) => {
-      state.updateMessage = action.payload;
     },
     addToast: (state, action: PayloadAction<ToastProps>) => {
       state.toasts.push({
@@ -128,13 +108,6 @@ export const pageSlice = createSlice({
         quotesON: action.payload
       };
     },
-    setReceiptPrintingOn: (state, action: PayloadAction<boolean>) => {
-      if (!state.settings) return;
-      state.settings = {
-        ...state.settings,
-        receiptPrintingOn: action.payload
-      };
-    },
     setReports: (state, action: PayloadAction<boolean>) => {
       if (!state.settings) return;
       state.settings = {
@@ -193,10 +166,7 @@ export const selectBusinessesSnapshotsOptions = createSelector(
   state => state.businessSnapshotOptions ?? []
 );
 export const selectVersion = createSelector(selectState, state => state.version);
-export const selectNewVersion = createSelector(selectState, state => state.newVersion);
-export const selectUpdateMessage = createSelector(selectState, state => state.updateMessage);
 export const selectAllowed = createSelector(selectState, state => state.isAllowedToLeave);
-export const selectDbReady = createSelector(selectState, state => state.dbReady);
 
 export const {
   enableLoading,
@@ -214,18 +184,13 @@ export const {
   setEInvoiceXRechnung,
   setPresets,
   setVersion,
-  setNewVersion,
-  setUpdateMessage,
   setCustomInvoiseSettings,
   setLanguageDate,
   setCategoryOptions,
   setUnitOptions,
   setBusinessSnapshotOptions,
   setClientSnapshotOptions,
-  setAllowed,
-  setReceiptPrintingOn,
-  setDbReady,
-  logout
+  setAllowed
 } = pageSlice.actions;
 
 export const pageReducer = pageSlice.reducer;

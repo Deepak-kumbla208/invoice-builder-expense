@@ -1,6 +1,5 @@
-import { DarkMode, Description, FileDownload, Language, LightMode, LocalPrintshopOutlined } from '@mui/icons-material';
+import { DarkMode, Description, FileDownload, Language, LightMode } from '@mui/icons-material';
 import AssessmentIcon from '@mui/icons-material/Assessment';
-import AutorenewIcon from '@mui/icons-material/Autorenew';
 import CoffeeIcon from '@mui/icons-material/Coffee';
 import ColorLensIcon from '@mui/icons-material/ColorLens';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -15,13 +14,13 @@ import UploadFileIcon from '@mui/icons-material/UploadFile';
 import { Box, Card, CardContent, Grid, Typography, useTheme } from '@mui/material';
 import { useContext, type FC } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getApi, isWebMode } from '../../../shared/api/restApi';
+import { getApi } from '../../../shared/api/restApi';
 import { ThemeContext } from '../../../shared/components/layout/theme/ThemeProviderWrapper';
 import { MenuList } from '../../../shared/components/lists/menuList/MenuList';
 import { MenuItemSettings } from '../../../shared/enums/menuItemSettings';
 import { Themes } from '../../../shared/enums/themes';
-import { useAppDispatch, useAppSelector } from '../../../state/configureStore';
-import { selectSettings, selectUpdateMessage, setUpdateMessage } from '../../../state/pageSlice';
+import { useAppSelector } from '../../../state/configureStore';
+import { selectSettings } from '../../../state/pageSlice';
 
 interface Props {
   onSelected?: (key: MenuItemSettings | undefined) => void;
@@ -33,7 +32,6 @@ interface Props {
   togglePresets?: (value: boolean) => void;
   toggleUBL?: (value: boolean) => void;
   toggleXRechnung?: (value: boolean) => void;
-  toggleReceiptPrinting?: (value: boolean) => void;
   onExportJSON?: () => void;
   onImportJSON?: () => void;
 }
@@ -44,7 +42,6 @@ export const Menu: FC<Props> = ({
   toggleReports = () => {},
   toggleStyleProfiles = () => {},
   togglePresets = () => {},
-  toggleReceiptPrinting = () => {},
   toggleUBL = () => {},
   onModeChange = () => {},
   onExportJSON = () => {},
@@ -55,8 +52,6 @@ export const Menu: FC<Props> = ({
   const { t } = useTranslation();
   const theme = useTheme();
   const storeSettings = useAppSelector(selectSettings);
-  const updateMessage = useAppSelector(selectUpdateMessage);
-  const dispatch = useAppDispatch();
 
   const personalization = [
     {
@@ -161,17 +156,6 @@ export const Menu: FC<Props> = ({
           onChange: () => {
             toggleXRechnung(!storeSettings?.xrechnungON);
           }
-        },
-        {
-          text: t('settingsMenuItems.titles.turnReceiptPrinting'),
-          description: t('settingsMenuItems.descriptions.turnReceiptPrinting'),
-          icon: <LocalPrintshopOutlined />,
-          isToggle: true,
-          isSelected: false,
-          checked: storeSettings?.receiptPrintingOn ?? true,
-          onChange: () => {
-            toggleReceiptPrinting(!storeSettings?.receiptPrintingOn);
-          }
         }
       ]
     }
@@ -257,28 +241,6 @@ export const Menu: FC<Props> = ({
     }
   ];
 
-  const appUpdater = [
-    {
-      items: [
-        ...(!isWebMode()
-          ? [
-              {
-                text: t('settingsMenuItems.titles.checkForUpdate'),
-                description: updateMessage,
-                icon: <AutorenewIcon />,
-                isToggle: false,
-                isSelected: false,
-                onClick: () => {
-                  dispatch(setUpdateMessage(t('common.checking')));
-                  getApi().checkForUpdates();
-                }
-              }
-            ]
-          : [])
-      ]
-    }
-  ];
-
   const appPromotion = [
     {
       items: [
@@ -340,13 +302,6 @@ export const Menu: FC<Props> = ({
               <MenuList useTooltip={false} items={githubLinks} showText={true} />
             </CardContent>
           </Card>
-          {!isWebMode() && (
-            <Card>
-              <CardContent>
-                <MenuList useTooltip={false} items={appUpdater} showText={true} />
-              </CardContent>
-            </Card>
-          )}
           <Card>
             <CardContent>
               <MenuList useTooltip={false} items={appPromotion} showText={true} />

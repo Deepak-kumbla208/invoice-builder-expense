@@ -10,21 +10,10 @@ import { useSettingsRetrieve } from '../shared/hooks/settings/useSettingsRetriev
 import type { Response } from '../shared/types/response';
 import type { Settings } from '../shared/types/settings';
 import { useAppDispatch, useAppSelector } from '../state/configureStore';
-import {
-  addToast,
-  removeToast,
-  selectAllowed,
-  selectDbReady,
-  selectIsLoading,
-  selectToasts,
-  setDbReady,
-  setSettings
-} from '../state/pageSlice';
+import { addToast, removeToast, selectAllowed, selectIsLoading, selectToasts, setSettings } from '../state/pageSlice';
 import { AppLayout } from './AppLayout';
-import { DatabaseChooser } from './DatabaseChooser/DatabaseChooser';
 
 export const App: FC = () => {
-  const dbReady = useAppSelector(selectDbReady);
   const isLoading = useAppSelector(selectIsLoading);
   const toasts = useAppSelector(selectToasts);
   const isAllowedToLeave = useAppSelector(selectAllowed);
@@ -33,8 +22,7 @@ export const App: FC = () => {
   const { showPrompt, cancelNavigation, confirmNavigation, attemptNavigation, setBlocked } =
     useBeforeLeave(isAllowedToLeave);
 
-  const { settings, execute: getSettings } = useSettingsRetrieve({
-    immediate: false,
+  const { settings } = useSettingsRetrieve({
     onDone: (data: Response<Settings>) => {
       if (!data.success) {
         if (data.message) {
@@ -51,11 +39,6 @@ export const App: FC = () => {
     },
     [dispatch]
   );
-
-  const onDatabaseRead = useCallback(() => {
-    dispatch(setDbReady(true));
-    getSettings();
-  }, [dispatch, getSettings]);
 
   const handleConfirmLeave = useCallback(() => {
     confirmNavigation();
@@ -75,12 +58,9 @@ export const App: FC = () => {
 
   return (
     <>
-      {!dbReady && <DatabaseChooser onDatabaseRead={onDatabaseRead} />}
-      {dbReady && (
-        <BeforeUnloadProvider value={{ attemptNavigation, setBlocked }}>
-          <AppLayout />
-        </BeforeUnloadProvider>
-      )}
+      <BeforeUnloadProvider value={{ attemptNavigation, setBlocked }}>
+        <AppLayout />
+      </BeforeUnloadProvider>
       <ToastContainer toasts={toasts} onClose={handleClose} />
       {isLoading && <SpinnerOverlay />}
       <Confirmation
