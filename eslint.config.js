@@ -40,6 +40,7 @@ export default [
       'prettier/prettier': 'error',
       '@typescript-eslint/no-var-requires': 'off',
       '@typescript-eslint/no-empty-function': 'off',
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       'react/react-in-jsx-scope': 'off',
       'no-case-declarations': 'off',
       'react-hooks/set-state-in-effect': 'off',

@@ -11,6 +11,7 @@
 ## Tasks
 
 ### 6.1 Security checklist (automated where possible, `__tests__/security/`)
+
 - **IDOR sweep:** enumerate every route with `:id` (from router metadata). For each, request a record from another company → 404. Extends the Phase 1–3 suites.
 - **CSRF:** every non-GET route without the token → 403; the login POST with a foreign `Origin` → 403.
 - **Cookies:** `__Host-sid` is Secure, HttpOnly, SameSite=Lax and Path=/; the token rotates on login; idle and absolute expiry are enforced.
@@ -23,6 +24,7 @@
 - **Dependencies:** `npm audit --omit=dev` has no high or critical issues (or each exception is documented).
 
 ### 6.2 Backups (`backup` compose service, profile `ops`)
+
 - Image `postgres:17-alpine` with `age`, `rclone` and `tar`. Nightly cron (02:30 IST) runs:
   1. `pg_dump -Fc` as `app_owner`.
   2. `tar` of `ATTACHMENTS_DIR`.
@@ -33,9 +35,11 @@
 - `scripts/restore.sh <date>`: fetches the backup, decrypts it (private key supplied at run time, never stored on the server), restores the DB into a fresh volume, restores attachments, then runs the verification query (every `expense_attachments.storage_key` exists on disk) and the health check.
 
 ### 6.3 Restore drill
+
 - On a separate machine or VM: restore the latest backup, log in, open an issued invoice PDF and an expense receipt, and run the report reconciliation. Record the result in `docs/ops/restore-drill-<date>.md`.
 
 ### 6.4 Operations docs (`docs/ops/`)
+
 - `install.md`: server prerequisites, DNS, `.env` (mode 600), `docker compose up`, `admin-cli create-super-admin`, and the first-run setup checklist.
 - `upgrade.md`: pull, backup, `migrate`, restart, smoke test.
 - `backup-restore.md`: key handling, rotation, drill procedure.
@@ -43,6 +47,7 @@
 - Update `README.md` for this product (web + PostgreSQL), keeping MIT licence and upstream credit.
 
 ### 6.5 Final regression
+
 - Full test suite and all e2e specs (invoice, expense, mobile, visual smoke) on a production-like `docker compose` stack with Caddy TLS.
 - Manual walkthrough of the user's original checklist:
   - Invoices: create, edit (draft), view, print, download PDF, customer info, calculations, tax, numbering.
@@ -51,6 +56,7 @@
   - Reports and exports.
 
 ## Exit criteria
+
 - [ ] Security checklist green; `npm audit` clean or documented
 - [ ] Encrypted off-host backup created by the scheduled job; restore drill passed and recorded
 - [ ] Ops docs complete

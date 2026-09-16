@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 type AsyncFunction<T> = (...args: unknown[]) => Promise<T>;
 
@@ -22,10 +22,20 @@ export const useAsync = <T>(asyncFn: AsyncFunction<T>, options: UseAsyncOptions 
   const [loading, setLoading] = useState(immediate);
   const [error, setError] = useState<Error | null>(null);
 
+  // Held in refs so `execute` only changes when `asyncFn` does: a caller whose
+  // callbacks are rebuilt on every render must not re-trigger the immediate run.
+  const onLoadingChangeRef = useRef(onLoadingChange);
+  const onErrorRef = useRef(onError);
+
+  useEffect(() => {
+    onLoadingChangeRef.current = onLoadingChange;
+    onErrorRef.current = onError;
+  }, [onLoadingChange, onError]);
+
   const execute = useCallback(
     (...args: unknown[]) => {
       setLoading(true);
-      onLoadingChange?.(true);
+      onLoadingChangeRef.current?.(true);
       setError(null);
 
       asyncFn(...args)
@@ -35,14 +45,14 @@ export const useAsync = <T>(asyncFn: AsyncFunction<T>, options: UseAsyncOptions 
         .catch(err => {
           const e = err as Error;
           setError(e);
-          onError?.(e);
+          onErrorRef.current?.(e);
         })
         .finally(() => {
           setLoading(false);
-          onLoadingChange?.(false);
+          onLoadingChangeRef.current?.(false);
         });
     },
-    [asyncFn, onLoadingChange, onError]
+    [asyncFn]
   );
 
   useEffect(() => {

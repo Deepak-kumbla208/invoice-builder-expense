@@ -1,27 +1,24 @@
-import sqlite3 from 'sqlite3';
-import { beforeEach, describe, expect, it } from 'vitest';
-import { createSqliteAdapter } from '../shared/db/client';
-import { initSchema } from '../shared/db/setup';
-import { up as createLayouts } from '../shared/migrations/20260902-27-invoice_layouts';
-import { up as seedLayouts } from '../shared/migrations/20260902-28-layout-schema-seeds';
-import type { DatabaseAdapter } from '../shared/types/DatabaseAdapter';
+// @vitest-environment node
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createPgTestDb, type PgTestDb } from './helpers/pgTestDb';
 
-type LayoutRow = { id: number; schema: string; isArchived: number };
+type LayoutRow = { id: number; schema: string; isArchived: boolean };
 
-describe('layout schema migrations', () => {
-  let db: DatabaseAdapter;
+describe('baseline layout seeds', () => {
+  let testDb: PgTestDb;
 
-  beforeEach(async () => {
-    db = createSqliteAdapter(new sqlite3.Database(':memory:'));
-    await initSchema(db);
+  beforeAll(async () => {
+    testDb = await createPgTestDb();
   });
 
-  it('creates schema storage and seeds active and archived built-in layouts idempotently', async () => {
-    await createLayouts(db);
-    await seedLayouts(db);
-    await seedLayouts(db);
+  afterAll(async () => {
+    await testDb.drop();
+  });
 
-    const layouts = await db.all<LayoutRow>('SELECT "id", "schema", "isArchived" FROM layouts ORDER BY "id"');
+  it('seeds active and archived built-in layouts', async () => {
+    const layouts = await testDb.withTx(db =>
+      db.all<LayoutRow>('SELECT "id", "schema", "isArchived" FROM layouts ORDER BY "id"')
+    );
     const names = layouts.map(layout => JSON.parse(layout.schema).meta.name);
 
     expect(names).toEqual(

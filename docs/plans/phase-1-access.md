@@ -11,6 +11,7 @@
 ## Tasks
 
 ### 1.1 DB roles and access schema
+
 - `db/init/00-roles.sql`, run by the postgres container on first start and by CI before migrations:
   - Create `app_owner` (LOGIN, BYPASSRLS) and `app_user` (LOGIN, NOBYPASSRLS).
   - On `app_user`, set `statement_timeout = '15s'` and `idle_in_transaction_session_timeout = '30s'`.
@@ -25,12 +26,14 @@
 - **Check:** migration applies cleanly twice (idempotency guard via the `migrations` table); `\dp` shows the expected grants.
 
 ### 1.2 Permission map (single source)
+
 - `src/backend/shared/auth/permissions.ts`: `PERMISSIONS` (key, group, label, sortOrder, `requires: string[]`) using the keys from design §7.1, plus `resolveDependencies(keys)`.
 - Import the map in the renderer through a path alias (no node imports inside it).
 - Migration seeds `permissions` and the three roles (Super Admin `is_system` = all keys; Office Admin; User) exactly as in design §7.1, **plus `admin.users` for Office Admin** (A8).
 - Test `permissions.sync.spec.ts`: DB keys equal map keys; seeded role sets are closed under `requires`.
 
 ### 1.3 RLS helpers and policies (access tables)
+
 - `migrations/0003-rls-access.sql`:
   - `STABLE SECURITY DEFINER` helpers `app_user_id()`, `app_office_ids() → int[]`, `app_business_ids() → int[]` and `app_all_offices() → bool`. They read `current_setting('app.*', true)` and treat NULL or `''` as empty. Each has a pinned `search_path` and `REVOKE FROM PUBLIC`.
   - `ENABLE` + `FORCE ROW LEVEL SECURITY` on `businesses`, `offices`, `users`, `user_offices`, `user_permissions`, `audit_logs`, `notifications`.
@@ -44,6 +47,7 @@
   - `auth_log_event(actor_id NULL, action, ip, meta jsonb)`.
 
 ### 1.4 Server auth middleware and transactions
+
 - `shared/db/tx.ts`:
   - `withRequestTx(ctx, fn)` runs BEGIN, `set_config('app.user_id'|'app.office_ids'|'app.business_ids'|'app.all_offices', …, true)`, then `fn`, then COMMIT.
   - `withSystemTx(jobName, fn)` lives in `shared/db/systemTx.ts`, sets `app.system`, and may only call `auth_cleanup_sessions` and `sys_*` functions.
@@ -63,9 +67,11 @@
 - Session cleanup job: hourly `setInterval` calling `withSystemTx('session-cleanup', …)`.
 
 ### 1.5 Admin CLI
+
 - `src/backend/admin-cli/index.ts` (`npm run admin -- create-super-admin`): prompts for email and password (min 12 chars), connects with `MIGRATION_DATABASE_URL`, creates the user with `all_offices = true` and the Super Admin role. Compose service `admin-cli` (profile `tools`).
 
 ### 1.6 Admin APIs (zod-validated, audited in the same transaction)
+
 - **Companies:** CRUD on `businesses` (UI name "Company"); archive only.
 - **Offices:**
   - CRUD. Validate `code` (`^[A-Z0-9]{2,3}$`) and GSTIN format (15 chars, state code prefix matches `state_code`); LUT fields.
@@ -83,6 +89,7 @@
 - **Audit:** `GET /api/audit-logs` (paged; `audit.view`).
 
 ### 1.7 Frontend shell
+
 - `state/authSlice.ts`. `platformApi.ts` adds `credentials: 'include'`, sends `X-CSRF-Token` from memory, and on 401 clears auth and routes to `/login` (keeping `returnTo`).
 - Pages:
   - `Login` (with "Forgot password? Contact your office admin."), `ChangePassword` (forced).
@@ -96,16 +103,19 @@
 - Super Admin dashboard placeholder with a **setup checklist empty state** (Company → Office with GSTIN → Bank → Users → Customers & items), computed from counts.
 
 ### 1.8 Remove unscoped import/export (A1)
+
 - Delete the full JSON export/import routes, service functions and UI menu items, and invoice import. Keep list XLSX export and customer/item XLSX import (company scoping is completed in Phase 2).
 
 ### 1.9 Tests (phase gate)
-- **Auth:** wrong password; lockout after limit; rotation on login; idle and absolute expiry; CSRF missing or invalid → 403; logout revokes; `must_change_password` gate; revocation on role/office/password/deactivate; no revocation on role *edit*.
+
+- **Auth:** wrong password; lockout after limit; rotation on login; idle and absolute expiry; CSRF missing or invalid → 403; logout revokes; `must_change_password` gate; revocation on role/office/password/deactivate; no revocation on role _edit_.
 - **Anti-escalation cases.**
 - **RLS suite harness** `__tests__/rls/`: table-driven. For each scoped table, define `seed(officeA, officeB)` and assert, as `app_user` with the Office A ctx: no SELECT/UPDATE/DELETE of B rows, INSERT into B is rejected, and an empty ctx returns 0 rows. Cover every table from 1.3.
 - **Permission matrix** `__tests__/permissions.matrix.spec.ts`: iterate the registered routes' permission metadata × seeded roles → expected 2xx/403.
 - **E2E:** create super admin via CLI → login → create company, office and user → login as that user → nav shows only permitted items → invoice regression spec still passes as Super Admin.
 
 ## Exit criteria
+
 - [ ] Phase gate green (lint, typecheck, tests, build, invoice regression e2e)
 - [ ] RLS suite, permission matrix and auth tests green
 - [ ] No route without `requirePermission` (except auth and health); a test enumerates the Express router to enforce this

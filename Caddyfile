@@ -1,0 +1,17 @@
+{$APP_DOMAIN} {
+	encode gzip
+
+	request_body {
+		max_size 20MB
+	}
+
+	handle /api/* {
+		reverse_proxy app:3000
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

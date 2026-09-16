@@ -1,9 +1,5 @@
-import type { NextFunction } from 'express';
-import { type Request, type Response } from 'express';
-import rateLimit from 'express-rate-limit';
 import { FilterType } from '../../shared/enums/filterType';
 import type { FilterData } from '../../shared/types/invoiceFilter';
-import { dbInstance } from '../database';
 
 export const parseFilter = (query: string | undefined): FilterData[] | undefined => {
   if (!query) return undefined;
@@ -34,26 +30,3 @@ export const parseFilter = (query: string | undefined): FilterData[] | undefined
 
   return result.length ? result : undefined;
 };
-
-export const requireDB = (_req: Request, res: Response, next: NextFunction) => {
-  if (!dbInstance) {
-    return res.status(400).json({
-      success: false,
-      message: undefined,
-      key: 'error.databaseNotInitialized'
-    });
-  }
-  next();
-};
-
-export const listDbLimiter = rateLimit({
-  windowMs: 10 * 1000,
-  max: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    success: false,
-    message: undefined,
-    key: 'error.rateLimiter'
-  }
-});

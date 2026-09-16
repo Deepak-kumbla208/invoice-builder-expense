@@ -1,5 +1,5 @@
+import type { Db } from '../db/tx';
 import type { Currency } from '../types/currency';
-import type { DatabaseAdapter } from '../types/DatabaseAdapter';
 import type { EntityWithCounts } from '../types/entityWithCounts';
 import type { FilterData } from '../types/invoiceFilter';
 import type { Response } from '../types/response';
@@ -9,7 +9,7 @@ import { mapDatabaseError } from '../utils/errorFunctions';
 const currencyFields: (keyof Currency)[] = ['code', 'symbol', 'text', 'format', 'isArchived', 'subunit'];
 
 export const getAllCurrencies = async (
-  db: DatabaseAdapter,
+  db: Db,
   filter?: FilterData[]
 ): Promise<Response<(Currency & EntityWithCounts)[]>> => {
   const getAll = getAllEntities<Currency>(db, 'currencies', 't', 'i', {
@@ -28,10 +28,7 @@ export const getAllCurrencies = async (
   return getAll(filter ?? []);
 };
 
-export const addCurrency = async (
-  db: DatabaseAdapter,
-  data: Currency
-): Promise<Response<Currency & EntityWithCounts>> => {
+export const addCurrency = async (db: Db, data: Currency): Promise<Response<Currency & EntityWithCounts>> => {
   const handle = handleEntity<Currency>(db, 'currencies', 'c', currencyFields, {
     joins: `LEFT JOIN invoices i ON i."currencyId" = c."id"`,
     invoiceCountExpr: `
@@ -46,10 +43,7 @@ export const addCurrency = async (
   return handle(data);
 };
 
-export const updateCurrency = async (
-  db: DatabaseAdapter,
-  data: Currency
-): Promise<Response<Currency & EntityWithCounts>> => {
+export const updateCurrency = async (db: Db, data: Currency): Promise<Response<Currency & EntityWithCounts>> => {
   const handle = handleEntity<Currency>(db, 'currencies', 'c', currencyFields, {
     joins: `LEFT JOIN invoices i ON i."currencyId" = c."id"`,
     invoiceCountExpr: `
@@ -64,16 +58,16 @@ export const updateCurrency = async (
   return handle(data, true);
 };
 
-export const deleteCurrency = async (db: DatabaseAdapter, id: number) => {
+export const deleteCurrency = async (db: Db, id: number) => {
   try {
     await db.run('DELETE FROM currencies WHERE id = ?;', [id]);
     return { success: true };
   } catch (error) {
-    return { success: false, ...mapDatabaseError(error, db.type) };
+    return { success: false, ...mapDatabaseError(error) };
   }
 };
 
-export const batchAddCurrency = async (db: DatabaseAdapter, data: Currency[]) => {
+export const batchAddCurrency = async (db: Db, data: Currency[]) => {
   const handle = handleEntity<Currency>(db, 'currencies', 'c', currencyFields, {
     joins: `LEFT JOIN invoices i ON i."currencyId" = c."id"`,
     invoiceCountExpr: `
@@ -86,26 +80,14 @@ export const batchAddCurrency = async (db: DatabaseAdapter, data: Currency[]) =>
        `
   });
   try {
-    await db.run('BEGIN');
     for (const row of data) {
       const result = await handle(row);
       if (!result.success) {
-        try {
-          await db.run('ROLLBACK');
-        } catch {
-          throw new Error(`error.rollbackFailed`);
-        }
         return result;
       }
     }
-    await db.run('COMMIT');
     return { success: true };
   } catch (error) {
-    try {
-      await db.run('ROLLBACK');
-    } catch {
-      throw new Error(`error.rollbackFailed`);
-    }
-    return { success: false, ...mapDatabaseError(error, db.type) };
+    return { success: false, ...mapDatabaseError(error) };
   }
 };

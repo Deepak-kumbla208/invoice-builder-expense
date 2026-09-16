@@ -1,7 +1,7 @@
 import { FilterType } from '../../shared/enums/filterType';
 import type { FilterData } from '../../shared/types/invoiceFilter';
-import type { DatabaseType } from '../enums/databaseType';
-import { getDefaultValue } from './dbHelper';
+
+type SqlFragment = { sql: string; params: unknown[] };
 
 export const getWhereClauseFromFilters = (data: {
   filters: FilterData[];
@@ -10,7 +10,7 @@ export const getWhereClauseFromFilters = (data: {
   businessNameSnapshotColumn?: string;
   issuedAtColumn?: string;
   statusColumn?: string;
-}): string => {
+}): SqlFragment => {
   const {
     filters,
     archivedColumn,
@@ -21,31 +21,42 @@ export const getWhereClauseFromFilters = (data: {
   } = data;
 
   const clauses: string[] = [];
+  const params: unknown[] = [];
 
   filters.forEach(({ type, value }) => {
     switch (type) {
       case FilterType.active:
-        if (archivedColumn) clauses.push(`${archivedColumn} = 0`);
+        if (archivedColumn) clauses.push(`${archivedColumn} = false`);
         break;
       case FilterType.archived:
-        if (archivedColumn) clauses.push(`${archivedColumn} = 1`);
+        if (archivedColumn) clauses.push(`${archivedColumn} = true`);
         break;
       case FilterType.client:
-        if (clientNameSnapshotColumn && value)
-          clauses.push(`${clientNameSnapshotColumn} = '${value.replace(/'/g, "''")}'`);
+        if (clientNameSnapshotColumn && value) {
+          clauses.push(`${clientNameSnapshotColumn} = ?`);
+          params.push(value);
+        }
         break;
       case FilterType.business:
-        if (businessNameSnapshotColumn && value)
-          clauses.push(`${businessNameSnapshotColumn} = '${value.replace(/'/g, "''")}'`);
+        if (businessNameSnapshotColumn && value) {
+          clauses.push(`${businessNameSnapshotColumn} = ?`);
+          params.push(value);
+        }
         break;
       case FilterType.date:
         if (issuedAtColumn && value) {
           const dates = value.split(',');
-          if (dates.length === 2) clauses.push(`${issuedAtColumn} BETWEEN '${dates[0]}' AND '${dates[1]}'`);
+          if (dates.length === 2) {
+            clauses.push(`${issuedAtColumn} BETWEEN ? AND ?`);
+            params.push(dates[0], dates[1]);
+          }
         }
         break;
       case FilterType.status:
-        if (statusColumn && value) clauses.push(`${statusColumn} = '${value.replace(/'/g, "''")}'`);
+        if (statusColumn && value) {
+          clauses.push(`${statusColumn} = ?`);
+          params.push(value);
+        }
         break;
       case FilterType.all:
       default:
@@ -53,11 +64,10 @@ export const getWhereClauseFromFilters = (data: {
     }
   });
 
-  return clauses.length ? clauses.join(' AND ') : '1=1';
+  return { sql: clauses.length ? clauses.join(' AND ') : '1=1', params };
 };
 
 export const getHavingClauseFromFilters = (data: {
-  dbType: DatabaseType;
   filters: FilterData[];
   invoiceUpdatedAtColumn?: string;
   invoiceIdColumn?: string;
@@ -66,10 +76,9 @@ export const getHavingClauseFromFilters = (data: {
   businessNameSnapshotColumn?: string;
   issuedAtColumn?: string;
   statusColumn?: string;
-}): string => {
+}): SqlFragment => {
   const {
     filters,
-    dbType,
     invoiceUpdatedAtColumn,
     issuedAtColumn,
     invoiceIdColumn,
@@ -79,28 +88,29 @@ export const getHavingClauseFromFilters = (data: {
     statusColumn
   } = data;
 
-  if (!filters?.length) return '';
+  if (!filters?.length) return { sql: '', params: [] };
 
   const clauses: string[] = [];
+  const params: unknown[] = [];
 
   filters.forEach(({ type, value }) => {
     switch (type) {
       case FilterType.noInvoices30:
         if (invoiceUpdatedAtColumn)
           clauses.push(
-            `(MAX(${invoiceUpdatedAtColumn}) IS NULL OR MAX(${invoiceUpdatedAtColumn}) < ${getDefaultValue("datetime('now', '-30 days')", dbType)})`
+            `(MAX(${invoiceUpdatedAtColumn}) IS NULL OR MAX(${invoiceUpdatedAtColumn}) < NOW() - INTERVAL '30 days')`
           );
         break;
       case FilterType.noInvoices60:
         if (invoiceUpdatedAtColumn)
           clauses.push(
-            `(MAX(${invoiceUpdatedAtColumn}) IS NULL OR MAX(${invoiceUpdatedAtColumn}) < ${getDefaultValue("datetime('now', '-60 days')", dbType)})`
+            `(MAX(${invoiceUpdatedAtColumn}) IS NULL OR MAX(${invoiceUpdatedAtColumn}) < NOW() - INTERVAL '60 days')`
           );
         break;
       case FilterType.noInvoices90:
         if (invoiceUpdatedAtColumn)
           clauses.push(
-            `(MAX(${invoiceUpdatedAtColumn}) IS NULL OR MAX(${invoiceUpdatedAtColumn}) < ${getDefaultValue("datetime('now', '-90 days')", dbType)})`
+            `(MAX(${invoiceUpdatedAtColumn}) IS NULL OR MAX(${invoiceUpdatedAtColumn}) < NOW() - INTERVAL '90 days')`
           );
         break;
       case FilterType.noInvoices:
@@ -110,25 +120,36 @@ export const getHavingClauseFromFilters = (data: {
         if (invoiceIdColumn) clauses.push(`(COUNT(${invoiceIdColumn}) > 0)`);
         break;
       case FilterType.active:
-        if (archivedColumn) clauses.push(`(${archivedColumn} = 0)`);
+        if (archivedColumn) clauses.push(`(${archivedColumn} = false)`);
         break;
       case FilterType.archived:
-        if (archivedColumn) clauses.push(`(${archivedColumn} = 1)`);
+        if (archivedColumn) clauses.push(`(${archivedColumn} = true)`);
         break;
       case FilterType.client:
-        if (clientNameSnapshotColumn) clauses.push(`${clientNameSnapshotColumn} = '${value.replace(/'/g, "''")}'`);
-        break;
-      case FilterType.business:
-        if (businessNameSnapshotColumn) clauses.push(`${businessNameSnapshotColumn} = '${value.replace(/'/g, "''")}'`);
-        break;
-      case FilterType.date:
-        const dates = value.split(',');
-        if (dates.length === 2 && issuedAtColumn) {
-          clauses.push(`${issuedAtColumn} BETWEEN '${dates[0]}' AND '${dates[1]}'`);
+        if (clientNameSnapshotColumn) {
+          clauses.push(`${clientNameSnapshotColumn} = ?`);
+          params.push(value);
         }
         break;
+      case FilterType.business:
+        if (businessNameSnapshotColumn) {
+          clauses.push(`${businessNameSnapshotColumn} = ?`);
+          params.push(value);
+        }
+        break;
+      case FilterType.date: {
+        const dates = value.split(',');
+        if (dates.length === 2 && issuedAtColumn) {
+          clauses.push(`${issuedAtColumn} BETWEEN ? AND ?`);
+          params.push(dates[0], dates[1]);
+        }
+        break;
+      }
       case FilterType.status:
-        if (statusColumn) clauses.push(`${statusColumn} = '${value.replace(/'/g, "''")}'`);
+        if (statusColumn) {
+          clauses.push(`${statusColumn} = ?`);
+          params.push(value);
+        }
         break;
       case FilterType.all:
       default:
@@ -136,7 +157,7 @@ export const getHavingClauseFromFilters = (data: {
     }
   });
 
-  if (!clauses.length) return '';
+  if (!clauses.length) return { sql: '', params: [] };
 
-  return `HAVING ${clauses.join(' AND ')}`;
+  return { sql: `HAVING ${clauses.join(' AND ')}`, params };
 };

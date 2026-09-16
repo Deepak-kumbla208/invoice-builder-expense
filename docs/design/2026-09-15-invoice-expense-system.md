@@ -43,20 +43,21 @@ Desktop/Electron app · SQLite · overseas entities or foreign tax regimes · IR
 
 ## 3a. Changes from Review — User Sign-off ⚠ (all confirmed 2026-09-15)
 
-| # | Change | Affects | Needed before |
-|---|---|---|---|
-| A1 | Remove full JSON import/export and invoice XLSX import (keep scoped XLSX export and customer/item XLSX import) | Existing features, S12 | Phase 1 |
-| A2 | Remove manual invoice number entry; drafts have no number | Existing features, S6 | Phase 2 |
-| A3 | GST scope: B2B, B2C, intra/inter-state, export and **SEZ** (LUT or IGST). **Out of scope:** reverse charge, deemed exports, e-commerce operator supplies | D7, S10 | Phase 2 |
-| A4 | Cancel only if the invoice has no recorded payments; no GSTR-1 filing tracking in v1 | D13, S9 | Phase 2 |
-| A5 | An invoice cannot be dated earlier than the latest issued document in its series | S8 | Phase 2 |
-| A6 | An office without a GSTIN can record expenses and quotes but cannot issue invoices or credit notes | D4, S5 | Phase 2 |
-| A7 | Encrypted backups copied to an off-host target (organisation provides the target and keeps the private key) | Ops, C10 | Phase 6 |
-| A8 | Office Admins can reset passwords for users within their own offices | C11, U2 | Phase 1 |
+| #   | Change                                                                                                                                                   | Affects                | Needed before |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- | ------------- |
+| A1  | Remove full JSON import/export and invoice XLSX import (keep scoped XLSX export and customer/item XLSX import)                                           | Existing features, S12 | Phase 1       |
+| A2  | Remove manual invoice number entry; drafts have no number                                                                                                | Existing features, S6  | Phase 2       |
+| A3  | GST scope: B2B, B2C, intra/inter-state, export and **SEZ** (LUT or IGST). **Out of scope:** reverse charge, deemed exports, e-commerce operator supplies | D7, S10                | Phase 2       |
+| A4  | Cancel only if the invoice has no recorded payments; no GSTR-1 filing tracking in v1                                                                     | D13, S9                | Phase 2       |
+| A5  | An invoice cannot be dated earlier than the latest issued document in its series                                                                         | S8                     | Phase 2       |
+| A6  | An office without a GSTIN can record expenses and quotes but cannot issue invoices or credit notes                                                       | D4, S5                 | Phase 2       |
+| A7  | Encrypted backups copied to an off-host target (organisation provides the target and keeps the private key)                                              | Ops, C10               | Phase 6       |
+| A8  | Office Admins can reset passwords for users within their own offices                                                                                     | C11, U2                | Phase 1       |
 
 ## 4. Current System Assessment (as inspected)
 
 ### Stack
+
 - **Frontend:** React 19, MUI 9, Redux Toolkit, react-router 7, Vite 8, i18next, recharts, `@react-pdf/renderer` (PDFs are generated in the browser).
 - **Backend:** Express 5 REST server (`src/backend/webserver`) and an Electron main process with IPC (`src/backend/main`). Both call a shared service layer (`src/backend/shared/services`).
 - **Data:** Raw SQL through a `DatabaseAdapter` supporting both SQLite and PostgreSQL (`?` placeholders are converted to `$n`). TypeScript migrations (30 files) run when the app connects. The base schema is in `shared/db/setup.ts`.
@@ -64,58 +65,60 @@ Desktop/Electron app · SQLite · overseas entities or foreign tax regimes · IR
 - **Tests:** about 6 unit/component tests and 2 Playwright specs (one Electron-only).
 
 ### Useful existing capabilities (preserve)
+
 - `businesses` entity with logo, address and contacts, plus **per-invoice snapshots** of business, client, bank, currency, items, layout and style profile.
 - Invoices and quotes, partial payments, payment statuses (unpaid, partially, paid, closed), discounts, surcharge, shipping, inclusive and exclusive tax, duplication, attachments, signatures.
 - JSON-driven PDF layouts (V1 and V2), style profiles, presets, custom labels, QR codes.
 - XLSX import/export, full JSON export/import, and basic revenue reports.
 
 ### Limitations and defects relevant to this project
-| # | Issue | Location |
-|---|---|---|
-| L1 | No authentication, users or roles | whole app |
-| L2 | Any browser can repoint the server's global database via `POST /api/databases` | `webserver/controllers/database.ts` |
-| L3 | The PostgreSQL adapter shares one `clientInTransaction` across all concurrent requests, so transactions from different users can interleave | `shared/db/client.ts:64` |
-| L4 | SQL string interpolation (`i."id" = ${id}`, type) | `shared/services/invoices.ts:669-670` |
-| L5 | `GET /api/invoices` returns every invoice with all snapshots and attachments as base64; no pagination | `services/invoices.ts` `getInvoices` |
-| L6 | Binary data stored in the database and transported as base64 JSON with a 50 MB body limit | `webserver/main.ts`, `platformApi.ts` |
-| L7 | Dual-dialect SQL doubles the effort for every schema change | `shared/utils/dbHelper.ts`, migrations |
-| L8 | Invoice numbering is scoped to business + client; the prefix is global | `invoice_sequences`, `settings` |
-| L9 | Tax model is generic (one rate), not GST | `invoices`, `invoice_items` |
-| L10 | Invoice totals are calculated in the browser, not stored for server-side reporting | renderer invoice form |
+
+| #   | Issue                                                                                                                                       | Location                               |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| L1  | No authentication, users or roles                                                                                                           | whole app                              |
+| L2  | Any browser can repoint the server's global database via `POST /api/databases`                                                              | `webserver/controllers/database.ts`    |
+| L3  | The PostgreSQL adapter shares one `clientInTransaction` across all concurrent requests, so transactions from different users can interleave | `shared/db/client.ts:64`               |
+| L4  | SQL string interpolation (`i."id" = ${id}`, type)                                                                                           | `shared/services/invoices.ts:669-670`  |
+| L5  | `GET /api/invoices` returns every invoice with all snapshots and attachments as base64; no pagination                                       | `services/invoices.ts` `getInvoices`   |
+| L6  | Binary data stored in the database and transported as base64 JSON with a 50 MB body limit                                                   | `webserver/main.ts`, `platformApi.ts`  |
+| L7  | Dual-dialect SQL doubles the effort for every schema change                                                                                 | `shared/utils/dbHelper.ts`, migrations |
+| L8  | Invoice numbering is scoped to business + client; the prefix is global                                                                      | `invoice_sequences`, `settings`        |
+| L9  | Tax model is generic (one rate), not GST                                                                                                    | `invoices`, `invoice_items`            |
+| L10 | Invoice totals are calculated in the browser, not stored for server-side reporting                                                          | renderer invoice form                  |
 
 ---
 
 ## 5. Decision Log
 
-| # | Decision | Alternatives considered | Rationale |
-|---|---|---|---|
-| D1 | **Web + PostgreSQL only.** Remove Electron and SQLite. The server connects to one configured database. | (B) keep Electron compiling for existing features; (C) keep both databases | One security model and one SQL dialect; removes L2 and L7. Cost: upstream merges become manual. |
-| D2 | **Access comes from assigned offices.** Company access follows from office. Invoices and expenses record `business_id` + `office_id`. `all_offices` bypasses the scope. | Company-level access; separate company and office grants | Matches Company → Office → User; keeps Office Admins limited; one mapping table |
-| D3 | **Role = editable set of permission checkboxes. User = one role + optional extra grants (grants only, no denies).** | Roles only; per-user copies of permissions | Role edits reach everyone; exceptions don't need new roles; no deny logic |
-| D4 | **The company holds the brand. Each office holds GSTIN, billing address, prefix and number series. Numbering is per office, per document type, per financial year.** | One series per company; keep current numbering | GST requires a unique series per GSTIN per financial year; companies may have offices in several states |
-| D5 | **One reimbursement per approved employee-paid expense; many reimbursements can be settled in one payout.** Company-paid and direct-supplier expenses complete on approval. | Claim batches; reimbursement as fields on the expense | Simple approvals, one payment action for many items, clean reports |
-| D6 | **All issuing offices are in India. Expenses are INR only. Invoices are multi-currency, with a locked exchange rate to INR.** | Overseas entities with local tax; both | Keeps tax India-only; reports total in INR |
-| D7 | **Full Indian GST on invoices** (customer GSTIN and place of supply, HSN/SAC and rate per item, automatic CGST+SGST, IGST or export with LUT or IGST, tax summary on PDF). | Keep generic tax; add IRN e-invoicing now | Compliant invoices without portal integration |
-| D8 | **Customers, items and presets belong to one company. Bank accounts belong to a company and are selected per office. Layouts, style profiles and expense categories are shared, with per-company defaults and toggles.** | Shared customer list linked to companies; everything shared | Company isolation with the simplest queries |
-| D9 | **One approval step. No self-approval.** An approver's own expense routes to another approver for that office or a Super Admin. | Threshold second approval; configurable chains | Sufficient for v1; thresholds can be added later without changing the schema |
-| D10 | **No departments.** | Departments on expenses | Office + category is sufficient |
-| D11 | **No IRN e-invoicing in v1.** | Build the IRP/GSP integration now | Turnover is below ₹5 crore |
-| D12 | **Approach C: extend in place + PostgreSQL row-level security.** | (A) app-layer scoping only; (B) rewrite data access with a query builder; rebuild on a new framework (rejected: breaks the preserve-invoices rule) | Defence in depth: a missing filter cannot leak another office's rows. Preserves the working invoice code. |
-| D13 | **v1 also includes draft → issued invoices locked after issue, credit notes and cancellation, and receivables ageing.** | Defer all extra features; add more | GST correctness for little extra work |
-| D14 | No service-level transactions. `Db` is bound to one transaction and throws when used outside it. `withSystemTx` (explicit system context) is used only by internal jobs and cannot be imported from controllers. | Keep per-service BEGIN/COMMIT | Review S1/C2; 11 services verified |
-| D15 | DB roles: `app_owner` (owner, BYPASSRLS, used only by one-shot `migrate`/`backup`/`admin-cli` containers) and `app_user` (API). Definer functions pin `search_path`, revoke from PUBLIC and return minimal columns. Auth audit events are written in their own transaction. | Owner without BYPASSRLS | C1/C5/C9 |
-| D16 | Invoice-side binaries stay in the DB with a 15 MB per-route JSON limit (1 MB elsewhere, 20 MB at Caddy). Expense files go on disk. | Move all binaries to disk | S2/C7; preserve rule |
-| D17 | At issue, the server rebuilds all snapshots from the DB, assigns the number and validates the date (IST calendar, ≤ today, ≥ last issued in series). Drafts, duplicates and quote conversions have no number. | Number at draft save; browser snapshots | S6/S8/C13 |
-| D18 | Supply type is derived from an editable place of supply (default: client state, or 96 for foreign clients). Covers B2B, B2C, intra/inter, export and SEZ (LUT or IGST). Integer-paisa shared tax module. Legacy tax fields are dropped. GST rates are seeded from current slabs and admin-editable (`NUMERIC`). | Country-based rule | S7/S10/U7/Arbiter cond. 8 |
-| D19 | Credit notes: positive amounts, exactly one original invoice, capped at uncredited value, with a warning after the statutory deadline. Cancel is only allowed without payments. | Negative amounts; cancel anytime | S9 |
-| D20 | Series per office. GSTIN may repeat across offices. Office code is 2–3 characters and globally unique. Format `{code}{T}/{YY-YY}/{seq4}` (T = "", CN, Q). | Series per GSTIN | S5/S15 |
-| D21 | Remove full JSON import/export and invoice import; keep scoped XLSX export and customer/item XLSX import | Keep all | S12 ⚠ A1 |
-| D22 | Caddy only (static SPA + `/api` proxy). No nginx, no CORS. `trust proxy 1`. | Caddy + nginx | C4/C14 |
-| D23 | Sessions and resets per assumption 3. Revoke a user's sessions only when that user's password, active flag, role assignment or offices change. Office Admin resets are allowed within scope, with anti-escalation rules. | Revoke on role edit | C11/U2/Arbiter cond. 5 |
-| D24 | Uploads: temp file written before the transaction; detected MIME type; `sharp` re-encode for images; sandboxed attachment download; iOS-safe `accept` list; 24 h grace before orphan cleanup | Magic bytes only | C6/C8/U10 |
-| D25 | Encrypted off-host backups; dump then files; restore drill checks files | Same-host backups | C10 ⚠ A7 |
-| D26 | Seed data plus a setup checklist in the Super Admin dashboard empty state, and empty-state messages on blocked screens | Setup wizard | U1 |
-| D27 | UX rules: combined employee status wording, stored `returned` expense status, DRAFT watermark, permission screen (role-locked, "affects N users", dependency map enforced by the server as well), switcher rules, notification bell | — | U3–U14/Arbiter cond. 7, 10 |
+| #   | Decision                                                                                                                                                                                                                                                                                                        | Alternatives considered                                                                                                                            | Rationale                                                                                                 |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| D1  | **Web + PostgreSQL only.** Remove Electron and SQLite. The server connects to one configured database.                                                                                                                                                                                                          | (B) keep Electron compiling for existing features; (C) keep both databases                                                                         | One security model and one SQL dialect; removes L2 and L7. Cost: upstream merges become manual.           |
+| D2  | **Access comes from assigned offices.** Company access follows from office. Invoices and expenses record `business_id` + `office_id`. `all_offices` bypasses the scope.                                                                                                                                         | Company-level access; separate company and office grants                                                                                           | Matches Company → Office → User; keeps Office Admins limited; one mapping table                           |
+| D3  | **Role = editable set of permission checkboxes. User = one role + optional extra grants (grants only, no denies).**                                                                                                                                                                                             | Roles only; per-user copies of permissions                                                                                                         | Role edits reach everyone; exceptions don't need new roles; no deny logic                                 |
+| D4  | **The company holds the brand. Each office holds GSTIN, billing address, prefix and number series. Numbering is per office, per document type, per financial year.**                                                                                                                                            | One series per company; keep current numbering                                                                                                     | GST requires a unique series per GSTIN per financial year; companies may have offices in several states   |
+| D5  | **One reimbursement per approved employee-paid expense; many reimbursements can be settled in one payout.** Company-paid and direct-supplier expenses complete on approval.                                                                                                                                     | Claim batches; reimbursement as fields on the expense                                                                                              | Simple approvals, one payment action for many items, clean reports                                        |
+| D6  | **All issuing offices are in India. Expenses are INR only. Invoices are multi-currency, with a locked exchange rate to INR.**                                                                                                                                                                                   | Overseas entities with local tax; both                                                                                                             | Keeps tax India-only; reports total in INR                                                                |
+| D7  | **Full Indian GST on invoices** (customer GSTIN and place of supply, HSN/SAC and rate per item, automatic CGST+SGST, IGST or export with LUT or IGST, tax summary on PDF).                                                                                                                                      | Keep generic tax; add IRN e-invoicing now                                                                                                          | Compliant invoices without portal integration                                                             |
+| D8  | **Customers, items and presets belong to one company. Bank accounts belong to a company and are selected per office. Layouts, style profiles and expense categories are shared, with per-company defaults and toggles.**                                                                                        | Shared customer list linked to companies; everything shared                                                                                        | Company isolation with the simplest queries                                                               |
+| D9  | **One approval step. No self-approval.** An approver's own expense routes to another approver for that office or a Super Admin.                                                                                                                                                                                 | Threshold second approval; configurable chains                                                                                                     | Sufficient for v1; thresholds can be added later without changing the schema                              |
+| D10 | **No departments.**                                                                                                                                                                                                                                                                                             | Departments on expenses                                                                                                                            | Office + category is sufficient                                                                           |
+| D11 | **No IRN e-invoicing in v1.**                                                                                                                                                                                                                                                                                   | Build the IRP/GSP integration now                                                                                                                  | Turnover is below ₹5 crore                                                                                |
+| D12 | **Approach C: extend in place + PostgreSQL row-level security.**                                                                                                                                                                                                                                                | (A) app-layer scoping only; (B) rewrite data access with a query builder; rebuild on a new framework (rejected: breaks the preserve-invoices rule) | Defence in depth: a missing filter cannot leak another office's rows. Preserves the working invoice code. |
+| D13 | **v1 also includes draft → issued invoices locked after issue, credit notes and cancellation, and receivables ageing.**                                                                                                                                                                                         | Defer all extra features; add more                                                                                                                 | GST correctness for little extra work                                                                     |
+| D14 | No service-level transactions. `Db` is bound to one transaction and throws when used outside it. `withSystemTx` (explicit system context) is used only by internal jobs and cannot be imported from controllers.                                                                                                | Keep per-service BEGIN/COMMIT                                                                                                                      | Review S1/C2; 11 services verified                                                                        |
+| D15 | DB roles: `app_owner` (owner, BYPASSRLS, used only by one-shot `migrate`/`backup`/`admin-cli` containers) and `app_user` (API). Definer functions pin `search_path`, revoke from PUBLIC and return minimal columns. Auth audit events are written in their own transaction.                                     | Owner without BYPASSRLS                                                                                                                            | C1/C5/C9                                                                                                  |
+| D16 | Invoice-side binaries stay in the DB with a 15 MB per-route JSON limit (1 MB elsewhere, 20 MB at Caddy). Expense files go on disk.                                                                                                                                                                              | Move all binaries to disk                                                                                                                          | S2/C7; preserve rule                                                                                      |
+| D17 | At issue, the server rebuilds all snapshots from the DB, assigns the number and validates the date (IST calendar, ≤ today, ≥ last issued in series). Drafts, duplicates and quote conversions have no number.                                                                                                   | Number at draft save; browser snapshots                                                                                                            | S6/S8/C13                                                                                                 |
+| D18 | Supply type is derived from an editable place of supply (default: client state, or 96 for foreign clients). Covers B2B, B2C, intra/inter, export and SEZ (LUT or IGST). Integer-paisa shared tax module. Legacy tax fields are dropped. GST rates are seeded from current slabs and admin-editable (`NUMERIC`). | Country-based rule                                                                                                                                 | S7/S10/U7/Arbiter cond. 8                                                                                 |
+| D19 | Credit notes: positive amounts, exactly one original invoice, capped at uncredited value, with a warning after the statutory deadline. Cancel is only allowed without payments.                                                                                                                                 | Negative amounts; cancel anytime                                                                                                                   | S9                                                                                                        |
+| D20 | Series per office. GSTIN may repeat across offices. Office code is 2–3 characters and globally unique. Format `{code}{T}/{YY-YY}/{seq4}` (T = "", CN, Q).                                                                                                                                                       | Series per GSTIN                                                                                                                                   | S5/S15                                                                                                    |
+| D21 | Remove full JSON import/export and invoice import; keep scoped XLSX export and customer/item XLSX import                                                                                                                                                                                                        | Keep all                                                                                                                                           | S12 ⚠ A1                                                                                                  |
+| D22 | Caddy only (static SPA + `/api` proxy). No nginx, no CORS. `trust proxy 1`.                                                                                                                                                                                                                                     | Caddy + nginx                                                                                                                                      | C4/C14                                                                                                    |
+| D23 | Sessions and resets per assumption 3. Revoke a user's sessions only when that user's password, active flag, role assignment or offices change. Office Admin resets are allowed within scope, with anti-escalation rules.                                                                                        | Revoke on role edit                                                                                                                                | C11/U2/Arbiter cond. 5                                                                                    |
+| D24 | Uploads: temp file written before the transaction; detected MIME type; `sharp` re-encode for images; sandboxed attachment download; iOS-safe `accept` list; 24 h grace before orphan cleanup                                                                                                                    | Magic bytes only                                                                                                                                   | C6/C8/U10                                                                                                 |
+| D25 | Encrypted off-host backups; dump then files; restore drill checks files                                                                                                                                                                                                                                         | Same-host backups                                                                                                                                  | C10 ⚠ A7                                                                                                  |
+| D26 | Seed data plus a setup checklist in the Super Admin dashboard empty state, and empty-state messages on blocked screens                                                                                                                                                                                          | Setup wizard                                                                                                                                       | U1                                                                                                        |
+| D27 | UX rules: combined employee status wording, stored `returned` expense status, DRAFT watermark, permission screen (role-locked, "affects N users", dependency map enforced by the server as well), switcher rules, notification bell                                                                             | —                                                                                                                                                  | U3–U14/Arbiter cond. 7, 10                                                                                |
 
 ---
 
@@ -135,6 +138,7 @@ Caddy (TLS, static SPA, /api/* proxy, 20 MB body cap)  →  Node/Express API
 ```
 
 ### 6.1 Code layout (evolves the existing structure)
+
 - `src/backend/webserver` — HTTP server, controllers, middleware (auth, CSRF, permission guard, error handler).
 - `src/backend/shared/services` — business logic (existing invoice services plus new modules).
 - `src/backend/shared/db` — `pg` Pool, `withRequestTx`, migration runner (PostgreSQL only).
@@ -145,6 +149,7 @@ Caddy (TLS, static SPA, /api/* proxy, 20 MB body cap)  →  Node/Express API
 - **Removed:** `src/backend/main`, `src/preload`, Electron Vite configs, `electron-builder.yml`, SQLite code paths, `/api/databases` endpoints.
 
 ### 6.2 Database roles and row-level security
+
 - **`app_owner`** owns the schema, has `BYPASSRLS`, and is used only by the one-shot `migrate`, `backup` and `admin-cli` containers (`MIGRATION_DATABASE_URL`). It owns all `SECURITY DEFINER` functions (`SET search_path = pg_catalog, public`, `REVOKE EXECUTE FROM PUBLIC`, `GRANT EXECUTE TO app_user`).
 - **Internal jobs** (session cleanup, orphan-file sweep) run in the API process through `withSystemTx(jobName, fn)`. It calls only dedicated definer functions (`auth_cleanup_sessions()`, `sys_attachment_keys()`), sets `app.system = jobName`, and lives in a module that controllers cannot import (enforced by an ESLint `no-restricted-imports` rule).
 - Helper functions treat `NULL` and `''` settings as empty. Each operation has its own policy (`USING` + `WITH CHECK`). Views use `security_invoker = true`.
@@ -157,6 +162,7 @@ Caddy (TLS, static SPA, /api/* proxy, 20 MB body cap)  →  Node/Express API
 - RLS scopes **rows**. **Action permissions** (e.g. `expense.approve`) and the own-versus-all rule are enforced in the API and services. Services still add office filters explicitly; RLS is the backstop.
 
 ### 6.3 Request flow
+
 1. `helmet`. JSON body limit is 1 MB, except 15 MB on `invoices`, `businesses`, `presets` and `styleProfiles` write routes (D16). Multipart uploads stream to a temp dir **before** any transaction opens. No CORS (same origin).
 2. Session: hash the cookie token → `auth_session` → build `ctx = { userId, roleId, permissions:Set, officeIds, businessIds, allOffices, ip, requestId }`.
 3. CSRF: non-GET requests must send `X-CSRF-Token` matching the session secret.
@@ -166,18 +172,20 @@ Caddy (TLS, static SPA, /api/* proxy, 20 MB body cap)  →  Node/Express API
 7. All SQL is parameterised (resolves L4).
 
 ### 6.4 Error handling
+
 Response shape stays `{ success, data, key, message }` for compatibility with existing screens.
 
-| Case | HTTP |
-|---|---|
-| Validation failure (zod) | 400 with field errors |
-| No or expired session | 401 |
-| Missing permission | 403 |
-| Not found **or** hidden by RLS | 404 (identical response, so IDs cannot be enumerated) |
-| Invalid status transition, sequence conflict, stale update | 409 |
-| Unexpected error | 500; logged with requestId; no stack trace to client |
+| Case                                                       | HTTP                                                  |
+| ---------------------------------------------------------- | ----------------------------------------------------- |
+| Validation failure (zod)                                   | 400 with field errors                                 |
+| No or expired session                                      | 401                                                   |
+| Missing permission                                         | 403                                                   |
+| Not found **or** hidden by RLS                             | 404 (identical response, so IDs cannot be enumerated) |
+| Invalid status transition, sequence conflict, stale update | 409                                                   |
+| Unexpected error                                           | 500; logged with requestId; no stack trace to client  |
 
 ### 6.5 Configuration (env)
+
 The API container receives only `DATABASE_URL` (`app_user`), `ATTACHMENTS_DIR`, `APP_ORIGIN` and `NODE_ENV`. `MIGRATION_DATABASE_URL` exists only in the one-shot `migrate`, `backup` and `admin-cli` services. Secrets live in a root-only `.env` (mode 600); only `.env.example` is committed. Pool `max = 20`. `app_user` has `statement_timeout = 15s` and `idle_in_transaction_session_timeout = 30s`. The first run uses `docker compose run --rm admin-cli create-super-admin`; no users are hard-coded. Logs never include bodies, cookies, tokens or passwords, and are kept 30 days.
 
 ---
@@ -219,18 +227,18 @@ sessions           token_hash PK, user_id, csrf_secret, expires_at, ip, user_age
 
 **Initial permission keys**
 
-| Group | Keys |
-|---|---|
-| Invoices | `invoice.create`, `invoice.view`, `invoice.view_all`, `invoice.edit`, `invoice.issue`, `invoice.cancel`, `invoice.delete` (drafts only), `invoice.print`, `invoice.download`, `credit_note.create` |
-| Customers | `customer.view`, `customer.manage` |
-| Expenses | `expense.create`, `expense.view_own`, `expense.view_all`, `expense.edit`, `expense.delete` (draft only), `expense.approve`, `expense.reject` |
-| Reimbursements | `reimbursement.view_own`, `reimbursement.view_all`, `reimbursement.pay`, `reimbursement.cancel` |
-| Reports | `report.view` |
-| Administration | `admin.users`, `admin.roles`, `admin.companies`, `admin.offices`, `admin.settings`, `admin.invoice_setup`, `admin.expense_categories`, `audit.view` |
+| Group          | Keys                                                                                                                                                                                               |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Invoices       | `invoice.create`, `invoice.view`, `invoice.view_all`, `invoice.edit`, `invoice.issue`, `invoice.cancel`, `invoice.delete` (drafts only), `invoice.print`, `invoice.download`, `credit_note.create` |
+| Customers      | `customer.view`, `customer.manage`                                                                                                                                                                 |
+| Expenses       | `expense.create`, `expense.view_own`, `expense.view_all`, `expense.edit`, `expense.delete` (draft only), `expense.approve`, `expense.reject`                                                       |
+| Reimbursements | `reimbursement.view_own`, `reimbursement.view_all`, `reimbursement.pay`, `reimbursement.cancel`                                                                                                    |
+| Reports        | `report.view`                                                                                                                                                                                      |
+| Administration | `admin.users`, `admin.roles`, `admin.companies`, `admin.offices`, `admin.settings`, `admin.invoice_setup`, `admin.expense_categories`, `audit.view`                                                |
 
-The "Request reimbursement" permission is implied by `expense.create` with payment type *employee paid*. "Approve reimbursement" is folded into `expense.approve` (D5).
+The "Request reimbursement" permission is implied by `expense.create` with payment type _employee paid_. "Approve reimbursement" is folded into `expense.approve` (D5).
 
-**Seeded roles** (editable): *Super Admin* (all), *Office Admin* (invoice.*, customer.*, expense.* incl. approve and reject, reimbursement.view_all and pay, report.view, audit.view), *User* (expense.create, expense.view_own, reimbursement.view_own; invoice permissions off by default).
+**Seeded roles** (editable): _Super Admin_ (all), _Office Admin_ (invoice._, customer._, expense.* incl. approve and reject, reimbursement.view_all and pay, report.view, audit.view), _User_ (expense.create, expense.view_own, reimbursement.view_own; invoice permissions off by default).
 
 ### 7.2 Invoices (changes to existing tables)
 
@@ -353,16 +361,16 @@ notifications
 
 ## 8. API Surface (summary)
 
-| Area | Endpoints |
-|---|---|
-| Auth | `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`, `POST /api/auth/change-password` |
-| Admin | `/api/users`, `/api/roles`, `/api/permissions`, `/api/companies`, `/api/offices`, `/api/expense-categories`, `/api/settings`, `/api/audit-logs` |
-| Invoices | `GET /api/invoices` (paged), `GET/PUT/DELETE /api/invoices/:id`, `POST /api/invoices`, `POST /api/invoices/:id/issue`, `POST /api/invoices/:id/cancel`, `POST /api/invoices/:id/credit-notes`, `POST /api/invoices/:id/duplicate`, `POST /api/invoices/:id/payments` |
-| Invoice setup | existing `/api/clients`, `/api/items`, `/api/banks`, `/api/presets`, `/api/layouts`, `/api/styleProfiles`, `/api/currencies`, `/api/units`, `/api/categories` (now company-scoped where applicable) |
-| Expenses | `GET/POST /api/expenses`, `GET/PUT/DELETE /api/expenses/:id`, `POST /api/expenses/:id/submit`, `/approve`, `/reject`, `POST /api/expenses/:id/attachments`, `GET /api/expenses/:id/attachments/:attachmentId` |
-| Reimbursements | `GET /api/reimbursements`, `POST /api/reimbursements/:id/cancel`, `GET/POST /api/payouts`, `GET /api/payouts/:id` |
-| Dashboard and reports | `GET /api/dashboard`, `GET /api/reports/{invoices,expenses,reimbursements,ageing}`, `…?format=csv` |
-| Notifications | `GET /api/notifications`, `POST /api/notifications/:id/read`, `POST /api/notifications/read-all` |
+| Area                  | Endpoints                                                                                                                                                                                                                                                            |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Auth                  | `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`, `POST /api/auth/change-password`                                                                                                                                                                |
+| Admin                 | `/api/users`, `/api/roles`, `/api/permissions`, `/api/companies`, `/api/offices`, `/api/expense-categories`, `/api/settings`, `/api/audit-logs`                                                                                                                      |
+| Invoices              | `GET /api/invoices` (paged), `GET/PUT/DELETE /api/invoices/:id`, `POST /api/invoices`, `POST /api/invoices/:id/issue`, `POST /api/invoices/:id/cancel`, `POST /api/invoices/:id/credit-notes`, `POST /api/invoices/:id/duplicate`, `POST /api/invoices/:id/payments` |
+| Invoice setup         | existing `/api/clients`, `/api/items`, `/api/banks`, `/api/presets`, `/api/layouts`, `/api/styleProfiles`, `/api/currencies`, `/api/units`, `/api/categories` (now company-scoped where applicable)                                                                  |
+| Expenses              | `GET/POST /api/expenses`, `GET/PUT/DELETE /api/expenses/:id`, `POST /api/expenses/:id/submit`, `/approve`, `/reject`, `POST /api/expenses/:id/attachments`, `GET /api/expenses/:id/attachments/:attachmentId`                                                        |
+| Reimbursements        | `GET /api/reimbursements`, `POST /api/reimbursements/:id/cancel`, `GET/POST /api/payouts`, `GET /api/payouts/:id`                                                                                                                                                    |
+| Dashboard and reports | `GET /api/dashboard`, `GET /api/reports/{invoices,expenses,reimbursements,ageing}`, `…?format=csv`                                                                                                                                                                   |
+| Notifications         | `GET /api/notifications`, `POST /api/notifications/:id/read`, `POST /api/notifications/read-all`                                                                                                                                                                     |
 
 All list endpoints accept `page`, `pageSize`, `sort` and typed filters, validated by zod.
 
@@ -393,22 +401,22 @@ All list endpoints accept `page`, `pageSize`, `sort` and typed filters, validate
 
 ## 10. Edge Cases
 
-| Situation | Behaviour |
-|---|---|
-| User removed from an office or permissions changed | Resolved per request, so effective on the next request |
-| User deactivated | All sessions revoked |
-| Last active Super Admin | Cannot be deactivated or demoted |
-| Office archived | No new invoices or expenses; history visible |
-| Approved or completed expense | Immutable; correct by cancelling an unpaid reimbursement |
-| Only approver submits own expense | Routes to the Super Admin queue |
-| Non-INR invoice | Exchange rate required before issue; locked on issue |
-| Issued invoice needs correction | Credit note or cancellation; no edit, no delete |
-| Draft abandoned | No number consumed |
-| Issue on 31 Mar vs 1 Apr | Financial year is derived from the issue date |
-| Concurrent issue | Sequence row lock gives unique, consecutive numbers |
-| LUT expired | `export_lut` is blocked; user must choose `export_igst` or update the LUT |
-| Interrupted upload | Temp file removed; a daily job removes orphaned storage files |
-| Request with no session context reaching the DB | RLS helpers return no rows |
+| Situation                                          | Behaviour                                                                 |
+| -------------------------------------------------- | ------------------------------------------------------------------------- |
+| User removed from an office or permissions changed | Resolved per request, so effective on the next request                    |
+| User deactivated                                   | All sessions revoked                                                      |
+| Last active Super Admin                            | Cannot be deactivated or demoted                                          |
+| Office archived                                    | No new invoices or expenses; history visible                              |
+| Approved or completed expense                      | Immutable; correct by cancelling an unpaid reimbursement                  |
+| Only approver submits own expense                  | Routes to the Super Admin queue                                           |
+| Non-INR invoice                                    | Exchange rate required before issue; locked on issue                      |
+| Issued invoice needs correction                    | Credit note or cancellation; no edit, no delete                           |
+| Draft abandoned                                    | No number consumed                                                        |
+| Issue on 31 Mar vs 1 Apr                           | Financial year is derived from the issue date                             |
+| Concurrent issue                                   | Sequence row lock gives unique, consecutive numbers                       |
+| LUT expired                                        | `export_lut` is blocked; user must choose `export_igst` or update the LUT |
+| Interrupted upload                                 | Temp file removed; a daily job removes orphaned storage files             |
+| Request with no session context reaching the DB    | RLS helpers return no rows                                                |
 
 ---
 
@@ -444,48 +452,48 @@ All list endpoints accept `page`, `pageSize`, `sort` and typed filters, validate
 
 ## 13. Additional Features
 
-| # | Feature | Value / users | Priority |
-|---|---|---|---|
-| 1 | Draft → Issued invoices, lock after issue | GST integrity; accountants and auditors | **v1** |
-| 2 | Credit notes and cancellation | Legal corrections without deletes | **v1** |
-| 3 | Receivables ageing (0–30, 31–60, 61–90, 90+) | Collections; admins and management | **v1** |
-| 4 | GSTR-1 export (B2B, B2CS, EXP, HSN) | Monthly filing effort; accountant | Next |
-| 5 | Tally / Zoho Books export | Accounting handoff; first ERP step | Next |
-| 6 | Vendor master (name, GSTIN, autocomplete) | Clean expense data | Next |
-| 7 | Recurring expenses (rent, internet, utilities) | Less manual entry; Office Admins | Next |
-| 8 | Recurring invoices (retainers) | Repeat billing | Next |
-| 9 | Email notifications and emailing invoices to clients | Faster approvals and delivery | Next |
-| 10 | Monthly budgets per office and category | Spend control; Office Admins and management | Later |
-| 11 | Petty cash / office float | Common Indian office practice | Later |
-| 12 | Employee advances settled against expenses | Travel | Later |
-| 13 | 2FA and Google/Microsoft SSO | Account security | Later |
-| 14 | API tokens and webhooks | ERP integration | Later |
-| 15 | IRN e-invoicing | Required if turnover exceeds ₹5 crore | Later |
+| #   | Feature                                              | Value / users                               | Priority |
+| --- | ---------------------------------------------------- | ------------------------------------------- | -------- |
+| 1   | Draft → Issued invoices, lock after issue            | GST integrity; accountants and auditors     | **v1**   |
+| 2   | Credit notes and cancellation                        | Legal corrections without deletes           | **v1**   |
+| 3   | Receivables ageing (0–30, 31–60, 61–90, 90+)         | Collections; admins and management          | **v1**   |
+| 4   | GSTR-1 export (B2B, B2CS, EXP, HSN)                  | Monthly filing effort; accountant           | Next     |
+| 5   | Tally / Zoho Books export                            | Accounting handoff; first ERP step          | Next     |
+| 6   | Vendor master (name, GSTIN, autocomplete)            | Clean expense data                          | Next     |
+| 7   | Recurring expenses (rent, internet, utilities)       | Less manual entry; Office Admins            | Next     |
+| 8   | Recurring invoices (retainers)                       | Repeat billing                              | Next     |
+| 9   | Email notifications and emailing invoices to clients | Faster approvals and delivery               | Next     |
+| 10  | Monthly budgets per office and category              | Spend control; Office Admins and management | Later    |
+| 11  | Petty cash / office float                            | Common Indian office practice               | Later    |
+| 12  | Employee advances settled against expenses           | Travel                                      | Later    |
+| 13  | 2FA and Google/Microsoft SSO                         | Account security                            | Later    |
+| 14  | API tokens and webhooks                              | ERP integration                             | Later    |
+| 15  | IRN e-invoicing                                      | Required if turnover exceeds ₹5 crore       | Later    |
 
 ---
 
 ## 14. Delivery Phases
 
-| Phase | Scope | Exit criteria |
-|---|---|---|
-| **0. Foundation** | Remove Electron and SQLite; PostgreSQL-only adapter with `withRequestTx`; consolidated baseline migration; parameterised SQL; Docker Compose with PostgreSQL; CI with a PostgreSQL service | Existing invoice flow works in the browser on PostgreSQL; existing tests pass; build passes |
-| **1. Access** | Users, roles, permissions, offices, user_offices, sessions, CSRF; RLS policies and DB roles; login UI; admin screens; permission-filtered navigation; audit log base | RLS suite and permission matrix green |
-| **2. Invoices** | Office and company scoping of invoices, clients, items, banks and presets; shared GST module; per-office per-FY numbering; INR rate; paged lists and detail endpoint; draft/issue/cancel; credit notes; PDF `gstSummary` block; invoice audit | GST, numbering, concurrency and invoice regression tests green; E2E invoice flow green |
-| **3. Expenses** | Categories, expenses, attachments, approvals, reimbursements, payouts, in-app notifications, audit | Workflow tests and E2E expense-to-payout green |
-| **4. UX** | Dashboard, office switcher, search and filters, receivables ageing, responsive layouts | Manual pass at phone, tablet and desktop widths; no permission leaks in the UI |
-| **5. Reports** | Invoice, expense, reimbursement and ageing reports; CSV and PDF export | Report totals reconcile with seeded data |
-| **6. Hardening** | Security checklist (IDOR, CSRF, uploads, headers, rate limits, session expiry); backup and restore drill; docs | Checklist complete; restore verified |
+| Phase             | Scope                                                                                                                                                                                                                                         | Exit criteria                                                                               |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| **0. Foundation** | Remove Electron and SQLite; PostgreSQL-only adapter with `withRequestTx`; consolidated baseline migration; parameterised SQL; Docker Compose with PostgreSQL; CI with a PostgreSQL service                                                    | Existing invoice flow works in the browser on PostgreSQL; existing tests pass; build passes |
+| **1. Access**     | Users, roles, permissions, offices, user_offices, sessions, CSRF; RLS policies and DB roles; login UI; admin screens; permission-filtered navigation; audit log base                                                                          | RLS suite and permission matrix green                                                       |
+| **2. Invoices**   | Office and company scoping of invoices, clients, items, banks and presets; shared GST module; per-office per-FY numbering; INR rate; paged lists and detail endpoint; draft/issue/cancel; credit notes; PDF `gstSummary` block; invoice audit | GST, numbering, concurrency and invoice regression tests green; E2E invoice flow green      |
+| **3. Expenses**   | Categories, expenses, attachments, approvals, reimbursements, payouts, in-app notifications, audit                                                                                                                                            | Workflow tests and E2E expense-to-payout green                                              |
+| **4. UX**         | Dashboard, office switcher, search and filters, receivables ageing, responsive layouts                                                                                                                                                        | Manual pass at phone, tablet and desktop widths; no permission leaks in the UI              |
+| **5. Reports**    | Invoice, expense, reimbursement and ageing reports; CSV and PDF export                                                                                                                                                                        | Report totals reconcile with seeded data                                                    |
+| **6. Hardening**  | Security checklist (IDOR, CSRF, uploads, headers, rate limits, session expiry); backup and restore drill; docs                                                                                                                                | Checklist complete; restore verified                                                        |
 
 ---
 
 ## 15. Risks
 
-| # | Risk | Mitigation |
-|---|---|---|
-| R1 | Invoice service (1,431 lines) core changes for GST and numbering | Characterisation tests before edits; narrow changes; keep snapshot model |
-| R2 | Browser preview versus server totals drift | One shared `tax` module used by both |
-| R3 | Layout JSON lacks GST blocks | Extend validator, renderer and `LAYOUT.md` with backward-compatible additions |
-| R4 | RLS debugging and performance complexity | Policy test suite; `STABLE` helper functions; indexes on `office_id` and `business_id`; explicit errors when context is missing |
-| R5 | Loss of upstream merges | Accepted (D1); cherry-pick specific upstream fixes manually if needed |
-| R6 | Client-side PDF generation on low-end phones | Separate preview view on mobile; server-side PDF can be added later if needed |
-| R7 | Baseline migration diverges from legacy schema assumptions in services | Phase 0 regression tests exercise every invoice service function on PostgreSQL |
+| #   | Risk                                                                   | Mitigation                                                                                                                      |
+| --- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| R1  | Invoice service (1,431 lines) core changes for GST and numbering       | Characterisation tests before edits; narrow changes; keep snapshot model                                                        |
+| R2  | Browser preview versus server totals drift                             | One shared `tax` module used by both                                                                                            |
+| R3  | Layout JSON lacks GST blocks                                           | Extend validator, renderer and `LAYOUT.md` with backward-compatible additions                                                   |
+| R4  | RLS debugging and performance complexity                               | Policy test suite; `STABLE` helper functions; indexes on `office_id` and `business_id`; explicit errors when context is missing |
+| R5  | Loss of upstream merges                                                | Accepted (D1); cherry-pick specific upstream fixes manually if needed                                                           |
+| R6  | Client-side PDF generation on low-end phones                           | Separate preview view on mobile; server-side PDF can be added later if needed                                                   |
+| R7  | Baseline migration diverges from legacy schema assumptions in services | Phase 0 regression tests exercise every invoice service function on PostgreSQL                                                  |

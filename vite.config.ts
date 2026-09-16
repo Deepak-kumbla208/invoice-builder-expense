@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => {
   const apiOrigin = process.env.VITE_API_URL ?? '';
 
   return {
-    base: './',
+    base: '/',
     plugins: [
       react(),
       {
@@ -28,7 +28,15 @@ export default defineConfig(({ mode }) => {
     server: {
       host: '127.0.0.1',
       port: 5173,
-      strictPort: true
+      strictPort: true,
+      // The API sends no CORS headers, so the dev server proxies /api/* to it
+      // and the browser only ever talks to this origin.
+      proxy: {
+        '/api': {
+          target: process.env.API_PROXY_TARGET ?? 'http://127.0.0.1:3000',
+          changeOrigin: false
+        }
+      }
     },
     build: {
       outDir: path.resolve(__dirname, 'dist-fe'),

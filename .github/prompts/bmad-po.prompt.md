@@ -55,6 +55,6 @@ Provide a concise scope note with:
 - If the work is medium/large, multi-slice, or spans multiple sessions, create or update a shared story artifact at `artifacts/story-<issue-or-slug>.md` using [.github/artifacts/story-template.md](.github/artifacts/story-template.md).
 
 ## Repository context
-- This is an Electron app with a React renderer, preload bridge, Electron main process, webserver, and SQLite-backed persistence.
+- This is a web app with a React renderer, an Express webserver, and PostgreSQL-backed persistence.
 - Prefer small, testable changes.
 - Highlight migration or packaging impact when relevant.

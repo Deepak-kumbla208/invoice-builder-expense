@@ -11,12 +11,14 @@
 ## Tasks
 
 ### 3.1 Migration `0005-expenses.sql`
+
 - New tables: `expense_categories`, `category_businesses (… is_enabled)`, `expenses` (status includes `returned`, CHECK against self-decision, composite FKs `(office_id, business_id)` and `(category_id, business_id)`), `expense_attachments`, `reimbursements` (partial unique `(expense_id) WHERE status <> 'cancelled'`, composite FKs), `reimbursement_payouts` (`UNIQUE(id, office_id)`).
 - Seed a starter category set: Water, Electricity, Internet, Office supplies, Stationery, Repairs & maintenance, Travel, Food & refreshments, Courier, Transportation, Software subscriptions, Equipment, Miscellaneous. Add a trigger or service hook so a new company gets enabled `category_businesses` rows.
 - RLS (ENABLE + FORCE, separate policies): expenses, reimbursements and payouts by `office_id`; attachments via the parent expense; categories readable by any authenticated user; `category_businesses` by `business_id`.
 - Definer function `sys_attachment_keys()`, used only by the orphan sweep.
 
 ### 3.2 Workflow module
+
 - `shared/workflow/expense.ts`: a transition table `{ from, action, to, permission, guard }`.
   - draft→submitted (`submit`, owner)
   - submitted→approved (`approve`, `expense.approve`, not submitter)
@@ -27,6 +29,7 @@
 - Unit tests cover the full table, including illegal transitions → 409.
 
 ### 3.3 Attachment storage (`shared/storage/attachments.ts`)
+
 - Multer disk storage in `ATTACHMENTS_DIR/tmp`, **before** `withRequestTx`, with a 10 MB limit and a single file per request.
 - Detect the type with `file-type` (JPG, PNG, WEBP, PDF only). Images are re-encoded with `sharp` (strips metadata); PDFs are stored as-is.
 - Compute `sha256` and move the file to `ATTACHMENTS_DIR/<uuid>`. In the same transaction, insert `expense_attachments` with the **detected** MIME type. On transaction failure, delete the file.
@@ -34,6 +37,7 @@
 - Daily orphan sweep via `withSystemTx('orphan-sweep')`: delete files older than 24 h with no key in `sys_attachment_keys()`; delete tmp files older than 1 h.
 
 ### 3.4 Services and controllers
+
 - **Expenses:**
   - Paged list with filters (employee, company, office, category, date, amount range, status, reimbursement status). `expense.view_own` → `submitted_by = me`; `view_all` → all in scope.
   - Detail; create and update allowed only in draft, rejected or returned.
@@ -60,6 +64,7 @@
 - Expense categories admin: CRUD plus per-company `is_enabled` toggles (`admin.expense_categories`).
 
 ### 3.5 UI
+
 - **Expenses list:** labelled "My expenses" without `view_all`; cards on mobile.
 - **Expense form:**
   - Office (required when "All" is selected; pre-filled for single-office users) and category (enabled for that company only).
@@ -74,6 +79,7 @@
 - **Admin:** Expense categories page with company toggles.
 
 ### 3.6 Tests (phase gate)
+
 - **Workflow:** every legal and illegal transition; self-approval blocked by both the service and the DB CHECK; resubmit after reject and after return; re-approve after a cancelled reimbursement creates a new reimbursement (partial unique index).
 - **Payouts:** mixed employees → 409; mixed offices → 409; a non-pending item → 409; totals correct; atomic (inject a failure → nothing changes).
 - **Uploads:**
@@ -91,6 +97,7 @@
 - **E2E (mobile viewport 390×844):** employee submits with a receipt photo → admin approves → admin records the payment → employee sees "Paid on <date> (ref)". Also: reject → edit → resubmit.
 
 ## Exit criteria
+
 - [ ] Phase gate green; invoice regression e2e still green
 - [ ] RLS suite covers all Phase 3 tables; permission matrix updated
 - [ ] `docs/plans/STATUS.md` updated

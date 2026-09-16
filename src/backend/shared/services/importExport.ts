@@ -1,10 +1,9 @@
-import { DatabaseType } from '../enums/databaseType';
 import type { Bank } from '../types/bank';
 import type { Business } from '../types/business';
 import type { Category } from '../types/category';
 import type { Client } from '../types/client';
 import type { Currency } from '../types/currency';
-import type { DatabaseAdapter } from '../types/DatabaseAdapter';
+import type { Db } from '../db/tx';
 import type { DbValue } from '../types/dbValue';
 import type {
   Invoice,
@@ -44,10 +43,10 @@ import {
   encodePreset,
   encodeStyleProfile
 } from '../utils/dataUrlFunctions';
-import { convertBooleanFieldsToInt, toDbValue } from '../utils/dbHelper';
+import { toDbValue } from '../utils/dbHelper';
 import { mapDatabaseError } from '../utils/errorFunctions';
 
-export const exportAllData = async (db: DatabaseAdapter) => {
+export const exportAllData = async (db: Db) => {
   try {
     const presets = await db.all<Bank>('SELECT * FROM presets');
     const invoiceSequences = await db.all<Bank>('SELECT * FROM invoice_sequences');
@@ -115,58 +114,28 @@ export const exportAllData = async (db: DatabaseAdapter) => {
 
     return { success: true, data: payload };
   } catch (error) {
-    return { success: false, ...mapDatabaseError(error, db.type) };
+    return { success: false, ...mapDatabaseError(error) };
   }
 };
 
-export const importAllData = async (db: DatabaseAdapter, parsed: Record<string, unknown>) => {
-  const runInTransaction = async (fn: () => Promise<void>) => {
-    try {
-      if (db.type === DatabaseType.sqlite) {
-        await db.run('PRAGMA foreign_keys = OFF;');
-      }
-      await db.run('BEGIN');
-      await fn();
-      await db.run('COMMIT');
-    } catch (err) {
-      try {
-        await db.run('ROLLBACK');
-      } catch {
-        throw new Error(`error.rollbackFailed`);
-      }
-      throw err;
-    } finally {
-      if (db.type === DatabaseType.sqlite) {
-        await db.run('PRAGMA foreign_keys = ON;');
-      }
-    }
-  };
-
+export const importAllData = async (db: Db, parsed: Record<string, unknown>) => {
   const insertRows = async <T extends Record<string, unknown>>(table: string, rows: T[]) => {
-    for (let row of rows) {
-      row = convertBooleanFieldsToInt(row);
-
+    for (const row of rows) {
       const keys = Object.keys(row).filter(k => k !== 'invoiceFullNumber');
       if (!keys.length) continue;
       const cols = keys.map(k => `"${k}"`).join(',');
       const placeholders = keys.map(() => '?').join(',');
       const params = keys.map(k => toDbValue(row[k]));
-      if (db.type === DatabaseType.postgre) {
-        await db.run(
-          `INSERT INTO ${table} (${cols}) 
-          OVERRIDING SYSTEM VALUE
-          VALUES (${placeholders})`,
-          params
-        );
-      } else {
-        await db.run(`INSERT INTO ${table} (${cols}) VALUES (${placeholders})`, params);
-      }
+      await db.run(
+        `INSERT INTO ${table} (${cols})
+        OVERRIDING SYSTEM VALUE
+        VALUES (${placeholders})`,
+        params
+      );
     }
   };
 
   const updateSettings = async (settings: Record<string, unknown>) => {
-    settings = convertBooleanFieldsToInt(settings);
-
     const fields: string[] = [];
     const params: DbValue[] = [];
 
@@ -184,112 +153,106 @@ export const importAllData = async (db: DatabaseAdapter, parsed: Record<string, 
   try {
     if (!parsed || typeof parsed !== 'object') return { success: false, key: 'invalidFile' };
 
-    await runInTransaction(async () => {
-      const deleteOrder = [
-        'presets',
-        'invoice_sequences',
-        'invoice_style_profile_snapshots',
-        'invoice_customizations',
-        'invoice_currency_snapshots',
-        'invoice_client_snapshots',
-        'invoice_bank_snapshots',
-        'invoice_business_snapshots',
-        'invoice_item_snapshots',
-        'invoice_items',
-        'invoice_layout_snapshots',
-        'attachments',
-        'invoices',
-        'items',
-        'businesses',
-        'clients',
-        'units',
-        'categories',
-        'currencies',
-        'style_profiles',
-        'layouts',
-        'banks'
-      ];
+    const deleteOrder = [
+      'presets',
+      'invoice_sequences',
+      'invoice_style_profile_snapshots',
+      'invoice_customizations',
+      'invoice_currency_snapshots',
+      'invoice_client_snapshots',
+      'invoice_bank_snapshots',
+      'invoice_business_snapshots',
+      'invoice_item_snapshots',
+      'invoice_items',
+      'invoice_layout_snapshots',
+      'attachments',
+      'invoices',
+      'items',
+      'businesses',
+      'clients',
+      'units',
+      'categories',
+      'currencies',
+      'style_profiles',
+      'layouts',
+      'banks'
+    ];
 
-      for (const table of deleteOrder) {
-        await db.run(`DELETE FROM ${table}`);
-      }
+    for (const table of deleteOrder) {
+      await db.run(`DELETE FROM ${table}`);
+    }
 
-      const tableDataMap: Record<string, string> = {
-        currencies: 'currencies',
-        units: 'units',
-        categories: 'categories',
-        businesses: 'businesses',
-        layouts: 'layouts',
-        style_profiles: 'styleProfiles',
-        banks: 'banks',
-        clients: 'clients',
-        items: 'items',
-        invoices: 'invoices',
-        invoice_sequences: 'invoiceSequences',
-        invoice_style_profile_snapshots: 'invoiceStyleProfileSnapshots',
-        invoice_business_snapshots: 'invoiceBusinessSnapshots',
-        invoice_bank_snapshots: 'invoiceBankSnapshots',
-        invoice_customizations: 'invoiceCustomizations',
-        invoice_client_snapshots: 'invoiceClientSnapshots',
-        invoice_currency_snapshots: 'invoiceCurrencySnapshots',
-        invoice_items: 'invoiceItems',
-        invoice_item_snapshots: 'invoiceItemSnapshots',
-        invoice_layout_snapshots: 'invoiceLayoutSnapshots',
-        invoice_payments: 'invoicePayments',
-        attachments: 'attachments',
-        presets: 'presets'
-      };
+    const tableDataMap: Record<string, string> = {
+      currencies: 'currencies',
+      units: 'units',
+      categories: 'categories',
+      businesses: 'businesses',
+      layouts: 'layouts',
+      style_profiles: 'styleProfiles',
+      banks: 'banks',
+      clients: 'clients',
+      items: 'items',
+      invoices: 'invoices',
+      invoice_sequences: 'invoiceSequences',
+      invoice_style_profile_snapshots: 'invoiceStyleProfileSnapshots',
+      invoice_business_snapshots: 'invoiceBusinessSnapshots',
+      invoice_bank_snapshots: 'invoiceBankSnapshots',
+      invoice_customizations: 'invoiceCustomizations',
+      invoice_client_snapshots: 'invoiceClientSnapshots',
+      invoice_currency_snapshots: 'invoiceCurrencySnapshots',
+      invoice_items: 'invoiceItems',
+      invoice_item_snapshots: 'invoiceItemSnapshots',
+      invoice_layout_snapshots: 'invoiceLayoutSnapshots',
+      invoice_payments: 'invoicePayments',
+      attachments: 'attachments',
+      presets: 'presets'
+    };
 
-      const parsedMut = { ...parsed };
+    const parsedMut = { ...parsed };
 
-      if (Array.isArray(parsedMut.attachments)) {
-        parsedMut.attachments = parsedMut.attachments.map(decodeInvoiceAttachment);
-      }
-      if (Array.isArray(parsedMut.styleProfiles)) {
-        parsedMut.styleProfiles = parsedMut.styleProfiles.map(decodeStyleProfile);
-      }
-      if (Array.isArray(parsedMut.banks)) {
-        parsedMut.banks = parsedMut.banks.map(decodeBank);
-      }
-      if (Array.isArray(parsedMut.businesses)) {
-        parsedMut.businesses = parsedMut.businesses.map(decodeLogo);
-      }
-      if (Array.isArray(parsedMut.invoices)) {
-        parsedMut.invoices = parsedMut.invoices.map(decodeInvoiceImport);
-      }
-      if (Array.isArray(parsedMut.invoiceBusinessSnapshots)) {
-        parsedMut.invoiceBusinessSnapshots = parsedMut.invoiceBusinessSnapshots.map(
-          decodeInvoiceBusinessSnapshotImport
-        );
-      }
-      if (Array.isArray(parsedMut.invoiceBankSnapshots)) {
-        parsedMut.invoiceBankSnapshots = parsedMut.invoiceBankSnapshots.map(decodeInvoiceBankSnapshotImport);
-      }
-      if (Array.isArray(parsedMut.invoiceCustomizations)) {
-        parsedMut.invoiceCustomizations = parsedMut.invoiceCustomizations.map(decodeInvoiceCustomizationImport);
-      }
-      if (Array.isArray(parsedMut.presets)) {
-        parsedMut.presets = parsedMut.presets.map(item => decodePreset(item, true));
-      }
+    if (Array.isArray(parsedMut.attachments)) {
+      parsedMut.attachments = parsedMut.attachments.map(decodeInvoiceAttachment);
+    }
+    if (Array.isArray(parsedMut.styleProfiles)) {
+      parsedMut.styleProfiles = parsedMut.styleProfiles.map(decodeStyleProfile);
+    }
+    if (Array.isArray(parsedMut.banks)) {
+      parsedMut.banks = parsedMut.banks.map(decodeBank);
+    }
+    if (Array.isArray(parsedMut.businesses)) {
+      parsedMut.businesses = parsedMut.businesses.map(decodeLogo);
+    }
+    if (Array.isArray(parsedMut.invoices)) {
+      parsedMut.invoices = parsedMut.invoices.map(decodeInvoiceImport);
+    }
+    if (Array.isArray(parsedMut.invoiceBusinessSnapshots)) {
+      parsedMut.invoiceBusinessSnapshots = parsedMut.invoiceBusinessSnapshots.map(decodeInvoiceBusinessSnapshotImport);
+    }
+    if (Array.isArray(parsedMut.invoiceBankSnapshots)) {
+      parsedMut.invoiceBankSnapshots = parsedMut.invoiceBankSnapshots.map(decodeInvoiceBankSnapshotImport);
+    }
+    if (Array.isArray(parsedMut.invoiceCustomizations)) {
+      parsedMut.invoiceCustomizations = parsedMut.invoiceCustomizations.map(decodeInvoiceCustomizationImport);
+    }
+    if (Array.isArray(parsedMut.presets)) {
+      parsedMut.presets = parsedMut.presets.map(item => decodePreset(item, true));
+    }
 
-      for (const [table, key] of Object.entries(tableDataMap)) {
-        await insertRows(table, ((parsedMut as Record<string, unknown>)[key] as Record<string, unknown>[]) ?? []);
-        if (db.type === DatabaseType.postgre) {
-          await db.run(`
-            SELECT setval(
-              pg_get_serial_sequence('${table}', 'id'),
-              (SELECT MAX(id) FROM ${table})
-            );`);
-        }
-      }
+    for (const [table, key] of Object.entries(tableDataMap)) {
+      await insertRows(table, ((parsedMut as Record<string, unknown>)[key] as Record<string, unknown>[]) ?? []);
+      await db.run(`
+        SELECT setval(
+          pg_get_serial_sequence('${table}', 'id'),
+          (SELECT MAX(id) FROM ${table})
+        );`);
+    }
 
-      if (parsedMut.settings && typeof parsedMut.settings === 'object') {
-        await updateSettings(parsedMut.settings as Record<string, unknown>);
-      }
-    });
+    if (parsedMut.settings && typeof parsedMut.settings === 'object') {
+      await updateSettings(parsedMut.settings as Record<string, unknown>);
+    }
 
     return { success: true };
   } catch (error) {
-    return { success: false, ...mapDatabaseError(error, db.type) };
+    return { success: false, ...mapDatabaseError(error) };
   }
 };

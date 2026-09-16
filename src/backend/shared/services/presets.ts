@@ -1,9 +1,8 @@
-import type { DatabaseAdapter } from '../types/DatabaseAdapter';
+import type { Db } from '../db/tx';
 import type { EntityWithId } from '../types/entityWithId';
 import type { FilterData } from '../types/invoiceFilter';
 import type { Preset } from '../types/preset';
 import type { Response } from '../types/response';
-import { getDefaultValue } from '../utils/dbHelper';
 import { mapDatabaseError } from '../utils/errorFunctions';
 import { getWhereClauseFromFilters } from '../utils/filterFunctions';
 
@@ -30,26 +29,16 @@ type GetPresetsOptions = {
   filter?: FilterData[];
 };
 
-const rollbackOrThrow = async (db: DatabaseAdapter) => {
-  try {
-    await db.run('ROLLBACK');
-  } catch {
-    throw new Error(`error.rollbackFailed`);
-  }
-};
-
 const handleEntity =
-  <T extends EntityWithId>(db: DatabaseAdapter, table: string, fields: readonly (keyof T)[]) =>
+  <T extends EntityWithId>(db: Db, table: string, fields: readonly (keyof T)[]) =>
   async (data: T, isUpdate = false): Promise<Response<number>> => {
-    const params = fields.map(key => (data[key] ?? null) as string | number | null);
+    const params = fields.map(key => (data[key] ?? null) as string | number | boolean | null);
 
     try {
       let lastID: number = -1;
 
       if (isUpdate) {
-        const setClause =
-          fields.map(f => `"${String(f)}" = ?`).join(', ') +
-          `, "updatedAt" = ${getDefaultValue("(datetime('now'))", db.type)}`;
+        const setClause = fields.map(f => `"${String(f)}" = ?`).join(', ') + `, "updatedAt" = NOW()`;
 
         await db.run(`UPDATE ${table} SET ${setClause} WHERE "id" = ?`, [...params, data.id ?? -1], true);
         lastID = data.id ?? -1;
@@ -64,22 +53,29 @@ const handleEntity =
 
       return { success: true, data: lastID };
     } catch (error) {
-      return { success: false, ...mapDatabaseError(error, db.type) };
+      return { success: false, ...mapDatabaseError(error) };
     }
   };
 
-const getPresets = async (db: DatabaseAdapter, options: GetPresetsOptions) => {
+const getPresets = async (db: Db, options: GetPresetsOptions) => {
   const { id, filter } = options;
 
-  const whereClause = filter
+  const where = filter
     ? getWhereClauseFromFilters({
         filters: filter,
         archivedColumn: 't."isArchived"'
       })
-    : '';
+    : undefined;
   const conditions: string[] = [];
-  if (id) conditions.push(`t."id" = ${id}`);
-  if (whereClause) conditions.push(whereClause);
+  const params: unknown[] = [];
+  if (id) {
+    conditions.push(`t."id" = ?`);
+    params.push(id);
+  }
+  if (where) {
+    conditions.push(where.sql);
+    params.push(...where.params);
+  }
   const whereSql = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
   const sql = `
         SELECT
@@ -137,8 +133,8 @@ const getPresets = async (db: DatabaseAdapter, options: GetPresetsOptions) => {
           sp."showQuantity" as "styleProfileShowQuantity",
           sp."showUnit" as "styleProfileShowUnit",
           sp."showRowNo" as "styleProfileShowRowNo",
-          sp."fieldSortOrders" as "styleProfileFieldSortOrders",          
-          sp."pdfTexts" as "styleProfilePdfTexts",       
+          sp."fieldSortOrders" as "styleProfileFieldSortOrders",
+          sp."pdfTexts" as "styleProfilePdfTexts",
           sp."watermarkFileName" as "styleProfileWatermarkFileName",
           sp."watermarkFileType" as "styleProfileWatermarkFileType",
           sp."watermarkFileSize" as "styleProfileWatermarkFileSize",
@@ -146,7 +142,7 @@ const getPresets = async (db: DatabaseAdapter, options: GetPresetsOptions) => {
           sp."paidWatermarkFileName" as "styleProfilePaidWatermarkFileName",
           sp."paidWatermarkFileType" as "styleProfilePaidWatermarkFileType",
           sp."paidWatermarkFileSize" as "styleProfilePaidWatermarkFileSize",
-          sp."paidWatermarkFileData" as "styleProfilePaidWatermarkFileData"                 
+          sp."paidWatermarkFileData" as "styleProfilePaidWatermarkFileData"
         FROM presets t
         LEFT JOIN style_profiles sp ON sp."id" = t."styleProfilesId"
         LEFT JOIN layouts l ON l."id" = sp."layoutId"
@@ -157,7 +153,7 @@ const getPresets = async (db: DatabaseAdapter, options: GetPresetsOptions) => {
         ${whereSql}
         ORDER BY t."createdAt" DESC
       `;
-  const presets = await db.all<Preset>(sql);
+  const presets = await db.all<Preset>(sql, params);
   const final = presets.map(preset => {
     return {
       ...preset,
@@ -177,92 +173,68 @@ const getPresets = async (db: DatabaseAdapter, options: GetPresetsOptions) => {
   return final;
 };
 
-export const getAllPresets = async (db: DatabaseAdapter, filter?: FilterData[]): Promise<Response<Preset[]>> => {
+export const getAllPresets = async (db: Db, filter?: FilterData[]): Promise<Response<Preset[]>> => {
   const presets = await getPresets(db, { filter });
 
   return { success: true, data: presets };
 };
 
-export const addPreset = async (db: DatabaseAdapter, data: Preset): Promise<Response<Preset>> => {
+export const addPreset = async (db: Db, data: Preset): Promise<Response<Preset>> => {
   try {
-    await db.run('BEGIN');
-
     const handle = handleEntity<Preset>(db, 'presets', presetFields);
     const result = await handle(data);
 
     if (!result.success || result.data == undefined) {
-      await rollbackOrThrow(db);
       return { success: false, key: result.key };
     }
-
-    await db.run('COMMIT');
 
     const newId = result.data;
     const newResult = await getPresets(db, { id: newId });
 
     return { success: true, data: newResult.length > 0 ? newResult[0] : undefined };
   } catch (error) {
-    await rollbackOrThrow(db);
-    return { success: false, ...mapDatabaseError(error, db.type) };
+    return { success: false, ...mapDatabaseError(error) };
   }
 };
 
-export const updatePreset = async (db: DatabaseAdapter, data: Preset): Promise<Response<Preset>> => {
+export const updatePreset = async (db: Db, data: Preset): Promise<Response<Preset>> => {
   try {
-    await db.run('BEGIN');
-
     const handle = handleEntity<Preset>(db, 'presets', presetFields);
     const result = await handle(data, true);
 
     if (!result.success || result.data == undefined) {
-      await rollbackOrThrow(db);
       return { success: false, key: result.key };
     }
-
-    await db.run('COMMIT');
 
     const newId = result.data;
     const newResult = await getPresets(db, { id: newId });
 
     return { success: true, data: newResult.length > 0 ? newResult[0] : undefined };
   } catch (error) {
-    await rollbackOrThrow(db);
-    return { success: false, ...mapDatabaseError(error, db.type) };
+    return { success: false, ...mapDatabaseError(error) };
   }
 };
 
-export const deletePreset = async (db: DatabaseAdapter, id: number) => {
+export const deletePreset = async (db: Db, id: number) => {
   try {
     await db.run('DELETE FROM presets WHERE "id" = ?;', [id]);
     return { success: true };
   } catch (error) {
-    return { success: false, ...mapDatabaseError(error, db.type) };
+    return { success: false, ...mapDatabaseError(error) };
   }
 };
 
-export const batchAddPreset = async (db: DatabaseAdapter, data: Preset[]) => {
+export const batchAddPreset = async (db: Db, data: Preset[]) => {
   const handle = handleEntity<Preset>(db, 'presets', presetFields);
   try {
-    await db.run('BEGIN');
     for (const row of data) {
       const result = await handle(row);
       if (!result.success) {
-        try {
-          await db.run('ROLLBACK');
-        } catch {
-          throw new Error(`error.rollbackFailed`);
-        }
         return result;
       }
     }
-    await db.run('COMMIT');
     return { success: true };
   } catch (error) {
-    try {
-      await db.run('ROLLBACK');
-    } catch {
-      throw new Error(`error.rollbackFailed`);
-    }
-    return { success: false, ...mapDatabaseError(error, db.type) };
+    return { success: false, ...mapDatabaseError(error) };
   }
 };

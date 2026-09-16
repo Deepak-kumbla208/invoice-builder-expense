@@ -1,7 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Provider } from 'react-redux';
-import { createBrowserRouter, createHashRouter, Navigate, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import { App } from './app/App';
 import './globalErrorHandlers';
 import './i18n';
@@ -20,7 +20,6 @@ import { SettingsPage } from './pages/settings';
 import { StyleProfilesPage } from './pages/styleProfiles';
 import { UnitsPage } from './pages/units';
 import reportWebVitals from './reportWebVitals';
-import { isWebMode } from './shared/api/restApi';
 import { GlobalErrorBoundaryWrapper } from './shared/components/feedback/globalErrorBoundaryWrapper/GlobalErrorBoundaryWrapper';
 import { ThemeProviderWrapper } from './shared/components/layout/theme/ThemeProviderWrapper';
 import { InvoiceType } from './shared/enums/invoiceType';
@@ -58,7 +57,7 @@ const createRouter = () => {
     }
   ];
 
-  return isWebMode() ? createBrowserRouter(routes) : createHashRouter(routes);
+  return createBrowserRouter(routes);
 };
 
 const startApp = async () => {

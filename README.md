@@ -1,24 +1,15 @@
-# Invoice Builder
+# Invoice + Office Expense System
 
-[![License](https://img.shields.io/github/license/piratuks/invoice-builder)](LICENSE)
-[![Downloads](https://img.shields.io/github/downloads/piratuks/invoice-builder/total)](https://github.com/piratuks/invoice-builder/releases)
-[![Latest Release](https://img.shields.io/github/v/release/piratuks/invoice-builder)](https://github.com/piratuks/invoice-builder/releases)
-![Windows](https://img.shields.io/badge/Windows-10%2B-blue?logo=windows)
-![Linux](https://img.shields.io/badge/Linux-DEB%20%7C%20AppImage-blue?logo=linux)
-![macOS](https://img.shields.io/badge/macOS-DMG-lightgrey?logo=apple&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-blue?style=flat-square&logo=docker&logoColor=white)
-[![GHCR](https://img.shields.io/badge/ghcr.io-invoice--builder-blue?style=flat-square&logo=github)](https://github.com/piratuks/invoice-builder/pkgs/container/invoice-builder)
-[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FF813F?style=flat&logo=buy-me-a-coffee&logoColor=white)](https://www.buymeacoffee.com/evaldizi)
+A web-only, PostgreSQL-only fork of [piratuks/invoice-builder](https://github.com/piratuks/invoice-builder),
+extended for three Indian companies: GST invoices, office expenses, reimbursements, role-based access
+control and row-level security.
 
-<a href="https://trendshift.io/repositories/17939?utm_source=repository-badge&amp;utm_medium=badge&amp;utm_campaign=badge-repository-17939" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/repositories/17939" alt="piratuks%2Finvoice-builder | Trendshift" width="250" height="55"/></a>
-<a href="https://trendshift.io/repositories/17939?utm_source=trendshift-badge&amp;utm_medium=badge&amp;utm_campaign=badge-trendshift-17939" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/17939/daily?language=TypeScript" alt="piratuks%2Finvoice-builder | Trendshift" width="250" height="55"/></a>
+The upstream project is an offline-first Electron desktop app. This fork is neither: it is a React
+single-page app served as static files, an Express REST API, and one PostgreSQL database shared by
+everyone who uses it.
 
-**Offline invoicing with full data ownership.**
-
-**Invoice Builder** is an **offline-first, open-source invoicing and quoting application** for freelancers and small businesses who want full control over their data.
-
-No accounts. No cloud. No subscriptions.  
-Your data stays on your machine in a database file you own.
+> **Status:** under active development. See [docs/plans/STATUS.md](docs/plans/STATUS.md) for the
+> current phase and what works today.
 
 ## 📸 Screenshots
 
@@ -26,455 +17,121 @@ Your data stays on your machine in a database file you own.
 ![Invoice PDF Preview](tutorial/invoice_pdf_preview.jpg)
 ![Quote PDF Preview](tutorial/quote_pdf_preview.jpg)
 
-## ❓ Why Invoice Builder?
+## ✨ Features
 
-Invoice Builder is designed for freelancers, contractors, and small businesses who want:
+### Invoicing (inherited from upstream)
 
-- **Full ownership of their data** - no cloud lock‑in
-- **Offline access** - works anywhere, anytime
-- **A predictable, transparent tool** - no subscriptions, no hidden sync
-- **Cross-platform support** - macOS, Windows & Linux
-- **Import/export freedom** - JSON, XLSX, full database backups
-- **Highly customizable PDFs** - branding, layout, colors, typography
-- **UBL & Peppol BIS 3.0 support** – generate invoices that are compliant with European e-invoicing standards for automatic submission to buyers and public administrations
-
-If you value **privacy, portability, and control**, this app is built for you.
-
-## ✨ Key Features
-
-### Core
-
-- Create and manage **Invoices** and **Quotes**
-- Offline-first: works without internet
-- Database-file based (create or open a database anywhere)
-- Automatic snapshotting of business, bank, style profile, layout, client, item, and currency data per invoice/quote
-- Multi-currency support: choose the currency for each invoice/quote individually
-- Responsive layout - usable on small and large screens, resizable windows supported
-- Invoice/Quote translations – select a language per document, independent of app settings
-- Export invoices in UBL 2.1 / Peppol BIS Billing 3.0 XML format, fully compliant for automated e-invoicing
-- Export invoices in XRechnung (UBL 2.1) XML format, fully compliant for automated e-invoicing
-- Native receipt printing for invoices and quotes in desktop Electron mode, including compact 80mm thermal receipt layouts for retail checkout workflows
-- Log out from the sidebar to return to the database selection screen and switch databases without restarting the app
-
-### Business Data Management
-
-- Banks, Businesses, Clients, Items, Categories, Units, Currencies
-- Persistent search, persistent sort, persistent filter, archive (non-destructive)
+- Create and manage **Invoices** and **Quotes**, with per-document currency and language
+- Automatic snapshotting of business, bank, style profile, layout, client, item and currency data
+  onto each invoice or quote
+- Highly customizable PDFs: branding, layout, colors, typography, watermarks, signatures, attachments
+- UBL 2.1 / Peppol BIS Billing 3.0 and XRechnung XML export
+- Fixed or percentage discounts and surcharges, shipping fees, part payments
+- Banks, Businesses, Clients, Items, Categories, Units, Currencies, with persistent search, sort,
+  filter and non-destructive archiving
 - XLSX import/export for most entities
-- Automatic creation of missing units/categories on item import
+- Reports and ageing views
 
-### Financial Flexibility
+### Added by this fork
 
-- Fixed or percentage surcharge
-- Fixed or percentage discounts
-- Shipping fees
-- Tax:
-  - inclusive or exclusive
-  - per-item or on total
-  - deducted tax
-- Partial payments, balance due tracking
-- Invoice states: unpaid, partially paid, paid, closed
-- Quote states: open, closed
+- Indian GST: CGST/SGST/IGST, place of supply, SEZ, HSN/SAC and per-office GSTIN
+- Multiple companies and offices, with per-office invoice numbering series
+- Office expenses, receipts and reimbursement approvals
+- Users, roles and permissions, enforced in the API and backed by PostgreSQL row-level security
+- Audit logging of every state change
 
-### PDF Generation & Customization
+See [docs/design/2026-09-15-invoice-expense-system.md](docs/design/2026-09-15-invoice-expense-system.md)
+for the design and [docs/plans](docs/plans) for the phased implementation plan.
 
-- Live PDF preview
-- A4 / Letter formats
-- Layout presets
-- Color, font size, font family (Supported fonts: Helvetica, Times-Roman, Courier, Roboto, Inter), logo size customization
-- Table header & row styles
-- Uppercase label toggle
-- Quote & invoice watermarks (including paid watermark)
-- Attachments: include images in PDFs
-- Signature support: upload or hand-draw signatures and apply them to PDFs
-- Style profiles are now available for invoices and quotes, enabling quick, consistent theming
-- Layouts page for importing and managing JSON-driven invoice PDF compositions
-- Customizable V1 and V2 JSON layout schemas, including page-level regions, sidebars, landscape compositions, recursive rows/columns/grids, and controlled content flow
-- Layout JSON controls section order, visibility, header composition, supported block placement, spacing, and table sizing
-- Export individual layouts as reusable JSON files
-- See [LAYOUT.md](LAYOUT.md) for the complete layout JSON structure and usage guide
-- Show quantity, unit, and row number in the PDF item table
-- Custom header sections and custom values in the PDF item table
-- Ability to reorder all columns/headers in the PDF item table
-- Ability to include QR codes for payment into PDF
-- Ability to customize invoice / quote labels to custom text
+## 🧱 Architecture
 
-### Reports
+| Piece                   | What it is                                                     |
+| ----------------------- | -------------------------------------------------------------- |
+| `src/renderer`          | React 19 + MUI 9 single-page app, built by Vite into `dist-fe` |
+| `src/backend/webserver` | Express 5 REST API, compiled by `tsc` into `dist-be`           |
+| `src/backend/shared`    | Services, the database layer and forward-only SQL migrations   |
+| PostgreSQL 17           | The only supported database, reached through `DATABASE_URL`    |
 
-- Aggregated data
-- Charts and summaries
+The renderer talks to the API over `fetch` only. Every request runs inside a single transaction
+(`withTx`), all SQL is parameterised, and schema changes are forward-only `.sql` migrations applied
+by `npm run migrate`.
 
-### Import, Export & Backup
+## 🚀 Development
 
-- Full database backup & restore
-- Export all data to JSON and import back
-- Export to XLSX for most entities
-- Invoices and quotes support export (historical documents remain immutable)
-
-### Settings & Customization
-
-- Language selection: currently French, German, English, Lithuanian and Portuguese
-- Number & date formatting (e.g. `1,234.10` vs `1.234,10`)
-- Invoice/quote number prefix & suffix
-- Leading-zero invoice/quote numbering is preserved across auto-increment (for consistent alphabetical file sorting)
-- File name customization for exported PDFs
-- Light & dark mode
-- Enable/disable UBL 2.1 Peppol BIS Billing 3.0, receipt printing, reports, style profiles, presets and quotes
-- Check for updates via GitHub releases
-- Presets: Predefine default Invoice/Quote data (e.g., business, client, currency, bank, style profile, notes, language, signature) to streamline document creation
-
-## 🖥️ Supported Platforms
-
-- **Windows:** 10 or newer, 64-bit
-- **Linux:** any modern distribution (Ubuntu, Debian, Linux Mint, etc.) supporting .deb packages or AppImage
-- **macOS:** 11.0 (Big Sur) or newer, Apple Silicon (M1/M2/M3/M4), 64-bit, .dmg installer available
-- **Memory:** 2 GB RAM minimum (1 GB may work for very small datasets)
-- **Disk space:** ~200 MB for the installer; ~550mb for the app; additional space needed for database files
-
-## 🐘 PostgreSQL Support
-
-Invoice Builder now supports **two database backends**:
-
-| Storage Type            | Description                                                           | Best For                                           |
-| ----------------------- | --------------------------------------------------------------------- | -------------------------------------------------- |
-| **SQLite (local file)** | Simple, portable, zero‑configuration database stored as a single file | Solo users, offline use, desktop mode              |
-| **PostgreSQL (server)** | Network‑accessible database server with concurrency and robustness    | Multi‑user setups, Docker deployments, NAS/servers |
-
-Users can now choose between:
-
-- **Creating or opening a local SQLite database file**, or
-- **Connecting to a PostgreSQL server** by entering host, port, username, password, and database name.
-
-This makes Invoice Builder flexible for both lightweight personal use and more advanced multi‑device or multi‑user environments.
-
-## 🧑‍💻 Self-Hosting (Docker)
-
-Invoice Builder can also be self-hosted using Docker for users who prefer running it on their own server or NAS.
-
-This option is ideal if you want:
-
-- Centralized access from multiple machines
-- Easy backups via mounted volumes
-
-### Docker Image
-
-A pre-built image is published automatically to GitHub Container Registry on every push to `main` and on every version tag:
+Requires Node.js 22+, npm and Docker.
 
 ```bash
-ghcr.io/piratuks/invoice-builder:latest
+docker compose -f docker-compose.dev.yml up -d   # postgres :5432, postgres-test :5433
+npm ci
+export DATABASE_URL=postgres://postgres:postgres@localhost:5432/invoice_expense
+npm run migrate                                  # apply migrations
+npm run dev                                      # vite :5173 + API :3000
 ```
 
-Pull it at any time with:
+| Command             | What it does                                       |
+| ------------------- | -------------------------------------------------- |
+| `npm run dev`       | Vite dev server and the API, together              |
+| `npm run migrate`   | Apply pending SQL migrations                       |
+| `npm run lint`      | ESLint over the whole repo                         |
+| `npm run typecheck` | TypeScript, renderer and server                    |
+| `npm test`          | Unit and integration tests (needs `postgres-test`) |
+| `npm run test:e2e`  | Playwright end-to-end tests                        |
+| `npm run build`     | Production `dist-fe` and `dist-be`                 |
+
+## 🐳 Running the stack
+
+`docker compose up` runs four services: `db` (PostgreSQL 17, internal network only), a one-shot
+`migrate`, `app` (the API), and `caddy`, which serves the built SPA, terminates TLS and proxies
+`/api/*` to the API. Only Caddy publishes ports (80 and 443).
 
 ```bash
-docker pull ghcr.io/piratuks/invoice-builder:latest
-```
-
-> **ℹ️ `VITE_API_URL` is no longer needed for Docker deployments.**
-> The Docker image now uses **nginx** as the frontend server. Nginx proxies all `/api/*` requests
-> to the backend internally, so the frontend never needs to know the backend's external address.
-> `VITE_API_URL` is only needed when running the web server outside Docker (e.g. `npm run dev:react`, `npm run dev:webserver`).
->
-> If you build the image yourself for non-Docker use, you can still pass it:
->
-> ```bash
-> docker build --build-arg VITE_API_URL=http://your-host:3000 -t invoice-builder .
-> ```
->
-> But for all standard Docker deployments you can omit it entirely.
-
----
-
-### Option A – Two containers (recommended)
-
-The default setup runs backend and frontend as separate containers from the same image.
-
-```bash
-docker compose pull
-docker compose up -d
-```
-
-| Container  | Port | Role                         |
-| ---------- | ---- | ---------------------------- |
-| `backend`  | 3000 | Node.js REST API + SQLite/PG |
-| `frontend` | 3001 | Static SPA served by `serve` |
-
----
-
-### Option B – Single container
-
-Run both backend and frontend in one container using `SERVICE=all`:
-
-```bash
-docker compose -f docker-compose.standalone.yml up -d
-```
-
-| Port | Role                         |
-| ---- | ---------------------------- |
-| 3000 | Node.js REST API + SQLite/PG |
-| 3001 | Static SPA served by `serve` |
-
----
-
-### Building locally instead of pulling
-
-If you prefer to build the image from source:
-
-```bash
-# Two-container build
+cp .env.example .env     # set APP_DOMAIN and POSTGRES_PASSWORD
 docker compose up -d --build
-docker compose up -d
-
-# Or single container
-docker build -t invoice-builder .
-docker compose -f docker-compose.standalone.yml up -d
 ```
 
-## 📦 Installation
+With `APP_DOMAIN=localhost` Caddy issues a certificate from its own internal CA, so
+`https://localhost` works immediately; the browser warns about the CA unless you trust it. For a
+real deployment set `APP_DOMAIN` to the public hostname and Caddy obtains a Let's Encrypt
+certificate on first start.
 
-Download the latest release from the **GitHub Releases** page:
+Migrations run as their own service before the API starts — `app` waits for `migrate` to complete
+successfully. To apply migrations without restarting the API, run `docker compose run --rm migrate`.
 
-➡️ [Download Latest Release](https://github.com/piratuks/invoice-builder/releases)
+### ⚙️ Environment variables
 
-No account required.
+| Variable                 | Used by   | Meaning                                                                          |
+| ------------------------ | --------- | -------------------------------------------------------------------------------- |
+| `DATABASE_URL`           | API       | PostgreSQL connection string for the application user                            |
+| `MIGRATION_DATABASE_URL` | `migrate` | Connection string for migrations; falls back to `DATABASE_URL`                   |
+| `HOST`                   | API       | Bind address (default `127.0.0.1`; the image sets `0.0.0.0`)                     |
+| `PORT`                   | API       | API port (default `3000`)                                                        |
+| `APP_DOMAIN`             | Caddy     | Hostname Caddy serves and requests a certificate for                             |
+| `POSTGRES_PASSWORD`      | `db`      | Password for the PostgreSQL superuser inside the container                       |
+| `TEST_DATABASE_URL`      | tests     | Test PostgreSQL (default `postgres://postgres:postgres@localhost:5433/postgres`) |
+| `API_PROXY_TARGET`       | dev only  | Where the Vite dev server proxies `/api/*` (default `http://127.0.0.1:3000`)     |
+| `VITE_API_URL`           | renderer  | API origin, for split-origin deployments; defaults to the page origin            |
 
-### Linux AppImage
+## 🤝 Contributing
 
-Make the AppImage executable and launch it:
-
-```bash
-chmod +x Invoice-Builder-*.AppImage
-./Invoice-Builder-*.AppImage
-```
-
-> ⚠️ **Browser download warning**
->
-> When downloading the app, your browser may show a message like:
->
-> - “This file is from an unknown source”
-> - “This file is rarely downloaded”
->
-> This is normal for newly published apps and does **not** indicate a security issue.  
-> Simply choose **Keep anyway / Save anyway** to proceed with the download.
->
-> 🐧 **Linux package warning**
->
-> On some Linux distributions (Ubuntu, Linux Mint, etc.), you may see messages such as:
->
-> - “This package is provided by a third party”
-> - “Installing software from outside the official repositories may be unsafe”
->
-> This warning appears because the app is not distributed via the default system repositories.  
-> If you downloaded the package directly from the official GitHub Releases page, it is safe to proceed.
->
-> 🍎 **macOS Gatekeeper warning**
->
-> Because this app is **unsigned**, macOS may display a message like:
->
-> - “App is damaged and can’t be opened. Move to Trash”
-> - “App is from an unidentified developer”
->
-> This happens because macOS Gatekeeper treats all unsigned apps downloaded from the internet as potentially unsafe.  
-> It adds a special **quarantine flag** to the app bundle, which prevents it from launching.
->
-> To fix this, after downloading and installing it:
->
-> 1. Open **Terminal**.
-> 2. Run the following command:
->
->    ```bash
->     sudo xattr -rd com.apple.quarantine "/Applications/Invoice Builder.app"
->    ```
-
-## 🚀 Quick Start
-
-1. Launch the application
-2. Create a new database file or open an existing one
-3. Add at least:
-   - a Layout
-   - a Business
-   - a Currency
-   - a Client
-   - a Bank
-   - an Item
-4. Create your first Invoice or Quote
-5. Preview and export to PDF
-
-## 📘 Tutorial
-
-Detailed tutorials and usage guides are available here: [TUTORIAL](TUTORIAL.md)
-
-Layout JSON structure and supported composition options are documented in [LAYOUT.md](LAYOUT.md).
-
-## 🧠 Data Model & Snapshots
-
-When an invoice or quote is created, snapshots of the following are stored with the document to ensure historical accuracy:
-
-- **Bank**
-- **Business**
-- **Client**
-- **Items**
-- **Currency**
-- **Style profile**
-- **Layout**
-
-Changes to these entities do **not** affect existing invoices or quotes.  
-Snapshots are updated only when editing an invoice or quote and changing the associated **client, business, item, or currency**.
-
-## 🔄 Backups & Data Portability
-
-You can:
-
-- **Back up and reopen** the full database file
-- **Export all data to JSON** and import it back
-- **Import and export layout JSON** files from the Layouts page
-- **Export entities to XLSX** for manual editing
-- **Import entities from XLSX**
-
-> **Note:** Invoices and quotes are export-only to preserve historical data integrity.
-
-## 🛠️ Development & Contributing
-
-### 📦 Running Locally
-
-Clone the repository, install dependencies, and start the development server:
-
-#### 🖥️ Electron (Desktop App)
-
-```bash
-git clone https://github.com/piratuks/invoice-builder.git
-cd invoice-builder
-npm install
-npm run dev
-```
-
-#### 🌐 Webserver / Browser
-
-```bash
-git clone https://github.com/piratuks/invoice-builder.git
-cd invoice-builder
-npm install
-npm run dev:react
-npm run dev:webserver
-```
-
-### ⚙️ Environment Variables
-
-- .env.development
-
-```env
-VITE_ENABLE_MOCKS={true|false} # Enables or disables mock data (Currently no mocked data is ready)
-VITE_API_URL={url} Backend webserver URL when running without Electron (Web/Docker mode)
-
-```
-
-- .env.production
-
-```env
-VITE_API_URL={url} Backend webserver URL when running without Electron (Web/Docker mode)
-```
-
-- .env.test
-
-```env
-VITE_API_URL={url} Backend webserver URL when running without Electron (Web/Docker mode)
-```
-
-- other (Some configuration values are not controlled through .env files and instead live directly in the codebase)
-  - Webserver configs (which are used only running locally not via docker) -> backend/webserver/config.ts
-  - Electron configs -> backend/main/config.ts
-
-### 📁 Project Structure
-
-```bash
-/src
-  /backend          – Electron + Webserver
-    /main           – Electron main process
-      /assets       - Static resources required by the main process
-      /ipc          - Your inter‑process communication layer
-    /webserver      - Web server (REST API)
-      /controllers  - HTTP request handlers (GET, POST, PUT, DELETE)
-      /utils        - Utility helpers used by the webserver
-    /shared         - Environment‑agnostic logic (used by both Electron and Webserver)
-      /db           - Database access layer shared across environments
-      /enums        - Centralized TypeScript enums used by the main process
-      /migrations   - Folder is used to manage and version database schema changes.
-      /services     - Business logic for each database entity
-      /types        - TypeScript interfaces and type definitions used exclusively by the Electron/Webserver
-      /utils        - Shared utility functions
-  /preload          – Electron preload scripts
-  /renderer         – UI code
-    /__tests__      – UI unit tests
-    /app            – Core React application
-    /assets         – Fonts, images, and other static assets
-    /i18n           – Translation files
-    /mocks          – MSW (mock service worker) for testing
-    /pages          – React components related to routing
-    /state          – Redux-related code
-    /shared
-      /api          – A neutral layer for Electron preload, IPC handlers, or a lightweight web server
-      /hooks        – Reusable React hooks
-      /components   – Shared UI components
-      /enums        – TypeScript enums
-      /types        – TypeScript types/interfaces
-      /utils        – Utility functions
-```
-
-### 🛠️ Core Stack
-
-- **Docker** - containerization for self‑hosting and reproducible deployments
-- **Electron** - cross-platform desktop framework
-- **SQLite** - lightweight, reliable embedded database
-- **TypeScript** - safer, maintainable code
-- **React** - UI framework
-- **MUI** - styling and UI components
-- **exceljs** - XLSX import/export
-- **@react-pdf/renderer** - PDF generation
-
-### 🗂️ Database Schema
-
-![Database Schema](schema.png)
-
-### 🤝 Contributing Guidelines
-
-Contributions of all kinds are welcome - bug reports, feature ideas, documentation improvements, and pull requests.  
-Please open an issue before starting major work to ensure alignment.
-
-- Report issues or features here: [ISSUES/FEATURES](https://github.com/piratuks/invoice-builder/issues)
-- Feature requests and discussions are welcome
-- Please follow [guidelines](CONTRIBUTING.md)
-- For agentic/AI-assisted development workflows, see [AGENTS.md](AGENTS.md)
+Read [CLAUDE.md](CLAUDE.md) first, then [docs/plans/STATUS.md](docs/plans/STATUS.md) for the active
+phase. [AGENTS.md](AGENTS.md) describes the agent-assisted workflow, and
+[CONTRIBUTING.md](CONTRIBUTING.md) the general guidelines.
 
 ## 📚 Documentation
 
-- [Tutorial](TUTORIAL.md)
+- [Design](docs/design/2026-09-15-invoice-expense-system.md) and
+  [design review](docs/design/2026-09-15-design-review.md)
+- [Implementation status and phase plans](docs/plans)
 - [Layout JSON reference](LAYOUT.md)
+- [Tutorial](TUTORIAL.md) — inherited from upstream and still describes the desktop app
 - [Privacy Policy](PRIVACY-POLICY.md)
 - [Terms of Use](TERMS-OF-USE.md)
 
-## 📌 Supported Versions
+## 📄 License and credit
 
-| Version | Status                |
-| ------- | --------------------- |
-| v2.8.0  | ✅ Actively supported |
-| v2.7.1  | ✅ Actively supported |
-| v2.7.0  | ✅ Actively supported |
+MIT, like the upstream project. See [LICENSE](LICENSE).
 
-Details about supported versions and update policy will be documented here.
-
-## 📄 License
-
-This project is licensed under the **MIT License**.  
-See the [LICENSE](LICENSE) file for details.
-
-## ☕ Support
-
-Invoice Builder is maintained by a single developer. Your support helps keep updates coming and new features rolling out!
-
-Want to be a part of this project’s journey? You can support it here: [Buy Me a Coffee](https://www.buymeacoffee.com/evaldizi)
-
-### 💖 Supporters
-
-See the full list of supporters here: [Supporters](SUPPORTERS.md)
-
-Every contribution counts, even a small one, and your name will appear here as a supporter of Invoice Builder.
+This is a fork of **[Invoice Builder](https://github.com/piratuks/invoice-builder)** by
+[piratuks](https://github.com/piratuks); the invoicing, PDF and e-invoicing engines are their work.
+If you want the original offline desktop app, use upstream — and consider supporting it via
+[Buy Me a Coffee](https://www.buymeacoffee.com/evaldizi).

@@ -1,8 +1,8 @@
 import type { Response } from '../../shared/types/response';
+import type { Db } from '../db/tx';
 import type { EInvoice } from '../enums/einvoice';
 import { InvoiceStatus } from '../enums/invoiceStatus';
 import { InvoiceType } from '../enums/invoiceType';
-import type { DatabaseAdapter } from '../types/DatabaseAdapter';
 import type { EntityWithId } from '../types/entityWithId';
 import type {
   CustomField,
@@ -22,7 +22,6 @@ import type {
   InvoiceStyleProfileSnapshots
 } from '../types/invoice';
 import type { FilterData } from '../types/invoiceFilter';
-import { getDefaultValue } from '../utils/dbHelper';
 import { generateInvoiceXML } from '../utils/einvoice/xmlProfiles';
 import { mapDatabaseError } from '../utils/errorFunctions';
 import { getWhereClauseFromFilters } from '../utils/filterFunctions';
@@ -192,17 +191,15 @@ const serializeLayoutSnapshot = (snapshot: InvoiceLayoutSnapshots) => ({
 });
 
 const handleEntity =
-  <T extends EntityWithId>(db: DatabaseAdapter, table: string, fields: readonly (keyof T)[]) =>
+  <T extends EntityWithId>(db: Db, table: string, fields: readonly (keyof T)[]) =>
   async (data: T, isUpdate = false): Promise<Response<number>> => {
-    const params = fields.map(key => (data[key] ?? null) as string | number | null);
+    const params = fields.map(key => (data[key] ?? null) as string | number | boolean | null);
 
     try {
       let lastID: number = -1;
 
       if (isUpdate) {
-        const setClause =
-          fields.map(f => `"${String(f)}" = ?`).join(', ') +
-          `, "updatedAt" = ${getDefaultValue("(datetime('now'))", db.type)}`;
+        const setClause = fields.map(f => `"${String(f)}" = ?`).join(', ') + `, "updatedAt" = NOW()`;
 
         await db.run(`UPDATE ${table} SET ${setClause} WHERE "id" = ?`, [...params, data.id ?? -1], true);
         lastID = data.id ?? -1;
@@ -217,19 +214,11 @@ const handleEntity =
 
       return { success: true, data: lastID };
     } catch (error) {
-      return { success: false, ...mapDatabaseError(error, db.type) };
+      return { success: false, ...mapDatabaseError(error) };
     }
   };
 
-const rollbackOrThrow = async (db: DatabaseAdapter) => {
-  try {
-    await db.run('ROLLBACK');
-  } catch {
-    throw new Error(`error.rollbackFailed`);
-  }
-};
-
-const createInvoiceHandlers = (db: DatabaseAdapter) => ({
+const createInvoiceHandlers = (db: Db) => ({
   handleInvoice: handleEntity<Invoice>(db, 'invoices', invoiceFields),
   handleInvoiceBankSnapshots: handleEntity<InvoiceBankSnapshots>(
     db,
@@ -292,7 +281,7 @@ const formatSequenceWithWidth = (nextSequence: number, width?: number) => {
 };
 
 const getSequenceScopeStats = async (
-  db: DatabaseAdapter,
+  db: Db,
   businessId: number,
   clientId: number,
   invoiceType: InvoiceType
@@ -317,7 +306,7 @@ const getSequenceScopeStats = async (
 };
 
 const getScopedNextSequence = async (
-  db: DatabaseAdapter,
+  db: Db,
   data: { businessId: number; clientId: number; invoiceNumber?: string; invoiceType: InvoiceType }
 ): Promise<{ nextSequence: number; paddingWidth?: number }> => {
   const stats = await getSequenceScopeStats(db, data.businessId, data.clientId, data.invoiceType);
@@ -336,7 +325,6 @@ const getScopedNextSequence = async (
 };
 
 const processItems = async (
-  db: DatabaseAdapter,
   handlers: {
     handleInvoiceItems: (data: InvoiceItem) => Promise<Response<number>>;
     handleInvoiceItemSnapshots: (data: InvoiceItemSnapshots) => Promise<Response<number>>;
@@ -351,7 +339,6 @@ const processItems = async (
       customField: item.customField ? JSON.stringify(item.customField) : undefined
     } as unknown as InvoiceItem);
     if (!r.success) {
-      await rollbackOrThrow(db);
       return r;
     }
     const newItemId = r.data;
@@ -361,7 +348,6 @@ const processItems = async (
         parentInvoiceItemId: newItemId
       } as unknown as InvoiceItemSnapshots);
       if (!ibs.success) {
-        await rollbackOrThrow(db);
         return ibs;
       }
     }
@@ -370,18 +356,17 @@ const processItems = async (
 };
 
 const processPayments = async (
-  db: DatabaseAdapter,
+  db: Db,
   handlers: { handleInvoicePayments: (data: InvoicePayment, isUpdate?: boolean) => Promise<Response<number>> },
   parentInvoiceId: number,
   payments?: InvoicePayment[] | null
 ) => {
   for (const payment of payments ?? []) {
     if (payment.id) {
-      const existing = await db.get(`SELECT "id" FROM invoice_payments WHERE "id" = ?`, [payment.id]);
+      const existing = await db.get(`SELECT "id" FROM invoice_payments WHERE "id" = ?::bigint`, [payment.id]);
       if (existing) {
         const r = await handlers.handleInvoicePayments({ ...payment, parentInvoiceId } as InvoicePayment, true);
         if (!r.success) {
-          await rollbackOrThrow(db);
           return r;
         }
         continue;
@@ -390,7 +375,6 @@ const processPayments = async (
 
     const r = await handlers.handleInvoicePayments({ ...payment, parentInvoiceId } as InvoicePayment);
     if (!r.success) {
-      await rollbackOrThrow(db);
       return r;
     }
   }
@@ -398,7 +382,6 @@ const processPayments = async (
 };
 
 const processAttachments = async (
-  db: DatabaseAdapter,
   handlers: { handleAttachments: (data: InvoiceAttachment) => Promise<Response<number>> },
   parentInvoiceId: number,
   attachments?: InvoiceAttachment[] | null
@@ -406,7 +389,6 @@ const processAttachments = async (
   for (const attachment of attachments ?? []) {
     const r = await handlers.handleAttachments({ ...attachment, parentInvoiceId } as InvoiceAttachment);
     if (!r.success) {
-      await rollbackOrThrow(db);
       return r;
     }
   }
@@ -414,7 +396,7 @@ const processAttachments = async (
 };
 
 const processSequence = async (
-  db: DatabaseAdapter,
+  db: Db,
   handlers: { handleSequences: (data: InvoiceSequence, isUpdate?: boolean) => Promise<Response<number>> },
   data: { clientId: number; businessId: number; invoiceNumber?: string; invoiceType: InvoiceType }
 ) => {
@@ -435,7 +417,6 @@ const processSequence = async (
       true
     );
     if (!r.success) {
-      await rollbackOrThrow(db);
       return r;
     }
   } else {
@@ -447,7 +428,6 @@ const processSequence = async (
       invoiceType: data.invoiceType
     } as InvoiceSequence);
     if (!r.success) {
-      await rollbackOrThrow(db);
       return r;
     }
   }
@@ -456,7 +436,7 @@ const processSequence = async (
 };
 
 const processSequenceOnUpdate = async (
-  db: DatabaseAdapter,
+  db: Db,
   handlers: { handleSequences: (data: InvoiceSequence, isUpdate?: boolean) => Promise<Response<number>> },
   data: {
     previousInvoiceNumber?: string;
@@ -504,7 +484,6 @@ const processSequenceOnUpdate = async (
       true
     );
     if (!r.success) {
-      await rollbackOrThrow(db);
       return r;
     }
   } else {
@@ -515,7 +494,6 @@ const processSequenceOnUpdate = async (
       invoiceType: data.invoiceType
     } as InvoiceSequence);
     if (!r.success) {
-      await rollbackOrThrow(db);
       return r;
     }
   }
@@ -542,7 +520,7 @@ const setPaidAtAndClosedAt = (invoice: Invoice): Invoice => {
 type SequenceHandler = (data: InvoiceSequence, isUpdate?: boolean) => Promise<Response<number>>;
 
 const getDuplicateInvoiceNumber = async (
-  db: DatabaseAdapter,
+  db: Db,
   handleSequences: SequenceHandler,
   data: {
     businessId: number;
@@ -651,10 +629,10 @@ const getDuplicateInvoiceNumber = async (
   return { success: true, data: formatSequenceWithWidth(sequenceData.nextSequence, sequenceData.paddingWidth) };
 };
 
-const getInvoices = async (db: DatabaseAdapter, options: GetInvoicesOptions) => {
+const getInvoices = async (db: Db, options: GetInvoicesOptions) => {
   const { id, type, filter } = options;
 
-  const whereClause = filter
+  const where = filter
     ? getWhereClauseFromFilters({
         filters: filter,
         businessNameSnapshotColumn: 'ibs."businessName"',
@@ -663,12 +641,22 @@ const getInvoices = async (db: DatabaseAdapter, options: GetInvoicesOptions) => 
         issuedAtColumn: 'i."issuedAt"',
         statusColumn: 'i."status"'
       })
-    : '';
+    : undefined;
 
   const conditions: string[] = [];
-  if (id) conditions.push(`i."id" = ${id}`);
-  if (type) conditions.push(`i."invoiceType" = '${type}'`);
-  if (whereClause) conditions.push(whereClause);
+  const params: unknown[] = [];
+  if (id) {
+    conditions.push(`i."id" = ?`);
+    params.push(id);
+  }
+  if (type) {
+    conditions.push(`i."invoiceType" = ?`);
+    params.push(type);
+  }
+  if (where) {
+    conditions.push(where.sql);
+    params.push(...where.params);
+  }
   const whereSql = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
   const invoicesSql = `
         SELECT i.*, c."format" as "currencyFormat"
@@ -679,7 +667,7 @@ const getInvoices = async (db: DatabaseAdapter, options: GetInvoicesOptions) => 
         ${whereSql}
         ORDER BY i."createdAt" DESC
       `;
-  const invoices = await db.all<Invoice>(invoicesSql);
+  const invoices = await db.all<Invoice>(invoicesSql, params);
 
   const invoiceIds = invoices.map(i => i.id) as number[];
 
@@ -689,57 +677,58 @@ const getInvoices = async (db: DatabaseAdapter, options: GetInvoicesOptions) => 
 
   const placeholders = invoiceIds.map(() => '?').join(', ');
 
-  const [
-    invoicePayments,
-    invoiceItems,
-    invoiceAttachments,
-    invoiceBusinessSnapshots,
-    invoiceClientSnapshots,
-    invoiceCurrencySnapshots,
-    invoiceCustomization,
-    invoiceStyleProfileSnapshots,
-    invoiceBankSnapshots,
-    invoiceLayoutSnapshots
-  ] = await Promise.all([
-    db.all<InvoicePayment>(`SELECT * FROM invoice_payments WHERE "parentInvoiceId" IN (${placeholders})`, invoiceIds),
-    db.all<InvoiceItem>(`SELECT * FROM invoice_items WHERE "parentInvoiceId" IN (${placeholders})`, invoiceIds),
-    db.all<InvoiceAttachment>(`SELECT * FROM attachments WHERE "parentInvoiceId" IN (${placeholders})`, invoiceIds),
-    db.all<InvoiceBusinessSnapshots>(
-      `SELECT * FROM invoice_business_snapshots WHERE "parentInvoiceId" IN (${placeholders})`,
-      invoiceIds
-    ),
-    db.all<InvoiceClientSnapshots>(
-      `SELECT * FROM invoice_client_snapshots WHERE "parentInvoiceId" IN (${placeholders})`,
-      invoiceIds
-    ),
-    db.all<InvoiceCurrencySnapshots>(
-      `SELECT * FROM invoice_currency_snapshots WHERE "parentInvoiceId" IN (${placeholders})`,
-      invoiceIds
-    ),
-    db.all<InvoiceCustomization>(
-      `SELECT * FROM invoice_customizations WHERE "parentInvoiceId" IN (${placeholders})`,
-      invoiceIds
-    ),
-    db.all<InvoiceStyleProfileSnapshots>(
-      `SELECT * FROM invoice_style_profile_snapshots WHERE "parentInvoiceId" IN (${placeholders})`,
-      invoiceIds
-    ),
-    db.all<InvoiceBankSnapshots>(
-      `SELECT * FROM invoice_bank_snapshots WHERE "parentInvoiceId" IN (${placeholders})`,
-      invoiceIds
-    ),
-    db.all<InvoiceLayoutSnapshots>(
-      `SELECT * FROM invoice_layout_snapshots WHERE "parentInvoiceId" IN (${placeholders})`,
-      invoiceIds
-    )
-  ]);
+  // Sequential, not Promise.all: these queries share one transaction connection, which can only
+  // run one query at a time.
+  const invoicePayments = await db.all<InvoicePayment>(
+    `SELECT * FROM invoice_payments WHERE "parentInvoiceId" IN (${placeholders})`,
+    invoiceIds
+  );
+  const invoiceItems = await db.all<InvoiceItem>(
+    `SELECT * FROM invoice_items WHERE "parentInvoiceId" IN (${placeholders})`,
+    invoiceIds
+  );
+  const invoiceAttachments = await db.all<InvoiceAttachment>(
+    `SELECT * FROM attachments WHERE "parentInvoiceId" IN (${placeholders})`,
+    invoiceIds
+  );
+  const invoiceBusinessSnapshots = await db.all<InvoiceBusinessSnapshots>(
+    `SELECT * FROM invoice_business_snapshots WHERE "parentInvoiceId" IN (${placeholders})`,
+    invoiceIds
+  );
+  const invoiceClientSnapshots = await db.all<InvoiceClientSnapshots>(
+    `SELECT * FROM invoice_client_snapshots WHERE "parentInvoiceId" IN (${placeholders})`,
+    invoiceIds
+  );
+  const invoiceCurrencySnapshots = await db.all<InvoiceCurrencySnapshots>(
+    `SELECT * FROM invoice_currency_snapshots WHERE "parentInvoiceId" IN (${placeholders})`,
+    invoiceIds
+  );
+  const invoiceCustomization = await db.all<InvoiceCustomization>(
+    `SELECT * FROM invoice_customizations WHERE "parentInvoiceId" IN (${placeholders})`,
+    invoiceIds
+  );
+  const invoiceStyleProfileSnapshots = await db.all<InvoiceStyleProfileSnapshots>(
+    `SELECT * FROM invoice_style_profile_snapshots WHERE "parentInvoiceId" IN (${placeholders})`,
+    invoiceIds
+  );
+  const invoiceBankSnapshots = await db.all<InvoiceBankSnapshots>(
+    `SELECT * FROM invoice_bank_snapshots WHERE "parentInvoiceId" IN (${placeholders})`,
+    invoiceIds
+  );
+  const invoiceLayoutSnapshots = await db.all<InvoiceLayoutSnapshots>(
+    `SELECT * FROM invoice_layout_snapshots WHERE "parentInvoiceId" IN (${placeholders})`,
+    invoiceIds
+  );
 
   const invoiceItemIds = invoiceItems.map(i => i.id) as number[];
   const placeholdersItems = invoiceItemIds.map(() => '?').join(', ');
-  const invoiceItemSnapshots = await db.all<InvoiceItemSnapshots>(
-    `SELECT sps.* FROM invoice_item_snapshots as sps WHERE "parentInvoiceItemId" IN (${placeholdersItems})`,
-    invoiceItemIds
-  );
+  const invoiceItemSnapshots =
+    invoiceItemIds.length > 0
+      ? await db.all<InvoiceItemSnapshots>(
+          `SELECT sps.* FROM invoice_item_snapshots as sps WHERE "parentInvoiceItemId" IN (${placeholdersItems})`,
+          invoiceItemIds
+        )
+      : [];
 
   return invoices.map(invoice => {
     const specificCustomization = invoiceCustomization.find(p => p.parentInvoiceId === invoice.id);
@@ -789,7 +778,7 @@ const getInvoices = async (db: DatabaseAdapter, options: GetInvoicesOptions) => 
   });
 };
 
-export const getInvoiceXML = async (db: DatabaseAdapter, data: { invoiceId: number; einvoice: EInvoice }) => {
+export const getInvoiceXML = async (db: Db, data: { invoiceId: number; einvoice: EInvoice }) => {
   const { invoiceId, einvoice } = data;
   const invoiceResult = await getInvoices(db, { id: invoiceId });
 
@@ -804,7 +793,7 @@ export const getInvoiceXML = async (db: DatabaseAdapter, data: { invoiceId: numb
 };
 
 export const getNextSequence = async (
-  db: DatabaseAdapter,
+  db: Db,
   data: { businessId: number; clientId: number; invoiceType: InvoiceType }
 ): Promise<Response<NextSequenceData | undefined>> => {
   const currentSequence = await db.get<InvoiceSequence>(
@@ -828,7 +817,7 @@ export const getNextSequence = async (
   };
 };
 
-export const getCustomHeaders = async (db: DatabaseAdapter, type: 'invoice' | 'quotation') => {
+export const getCustomHeaders = async (db: Db, type: 'invoice' | 'quotation') => {
   const rows = await db.all<{ customField: string | null }>(
     `
     SELECT ii."customField"
@@ -853,21 +842,21 @@ export const getCustomHeaders = async (db: DatabaseAdapter, type: 'invoice' | 'q
   return { success: true, data: headersMeta };
 };
 
-export const getAllInvoices = async (db: DatabaseAdapter, type?: 'invoice' | 'quotation', filter?: FilterData[]) => {
+export const getAllInvoices = async (db: Db, type?: 'invoice' | 'quotation', filter?: FilterData[]) => {
   const finalInvoices = await getInvoices(db, { type, filter });
   return { success: true, data: finalInvoices };
 };
 
-export const deleteInvoice = async (db: DatabaseAdapter, id: number) => {
+export const deleteInvoice = async (db: Db, id: number) => {
   try {
     await db.run('DELETE FROM invoices WHERE "id" = ?;', [id]);
     return { success: true };
   } catch (error) {
-    return { success: false, ...mapDatabaseError(error, db.type) };
+    return { success: false, ...mapDatabaseError(error) };
   }
 };
 
-export const addInvoice = async (db: DatabaseAdapter, data: Invoice) => {
+export const addInvoice = async (db: Db, data: Invoice) => {
   const {
     handleInvoice,
     handleInvoiceBankSnapshots,
@@ -885,14 +874,11 @@ export const addInvoice = async (db: DatabaseAdapter, data: Invoice) => {
   } = createInvoiceHandlers(db);
 
   try {
-    await db.run('BEGIN');
-
     const formatedData = setPaidAtAndClosedAt(data);
 
     const result = await handleInvoice(formatedData);
 
     if (!result.success || result.data == undefined) {
-      await rollbackOrThrow(db);
       return { success: false, key: result.key };
     }
 
@@ -903,7 +889,6 @@ export const addInvoice = async (db: DatabaseAdapter, data: Invoice) => {
         parentInvoiceId: newId
       });
       if (!ibs.success) {
-        await rollbackOrThrow(db);
         return { success: false, key: ibs.key, message: ibs.message };
       }
     }
@@ -915,7 +900,6 @@ export const addInvoice = async (db: DatabaseAdapter, data: Invoice) => {
         pdfTexts: JSON.stringify(data.invoiceCustomization.pdfTexts)
       });
       if (!ibs.success) {
-        await rollbackOrThrow(db);
         return { success: false, key: ibs.key, message: ibs.message };
       }
     }
@@ -925,7 +909,6 @@ export const addInvoice = async (db: DatabaseAdapter, data: Invoice) => {
         parentInvoiceId: newId
       });
       if (!ibs.success) {
-        await rollbackOrThrow(db);
         return { success: false, key: ibs.key, message: ibs.message };
       }
     }
@@ -935,7 +918,6 @@ export const addInvoice = async (db: DatabaseAdapter, data: Invoice) => {
         parentInvoiceId: newId
       });
       if (!ibs.success) {
-        await rollbackOrThrow(db);
         return { success: false, key: ibs.key, message: ibs.message };
       }
     }
@@ -945,7 +927,6 @@ export const addInvoice = async (db: DatabaseAdapter, data: Invoice) => {
         parentInvoiceId: newId
       });
       if (!ibs.success) {
-        await rollbackOrThrow(db);
         return { success: false, key: ibs.key, message: ibs.message };
       }
     }
@@ -955,7 +936,6 @@ export const addInvoice = async (db: DatabaseAdapter, data: Invoice) => {
         parentInvoiceId: newId
       });
       if (!ibs.success) {
-        await rollbackOrThrow(db);
         return { success: false, key: ibs.key, message: ibs.message };
       }
     }
@@ -965,13 +945,11 @@ export const addInvoice = async (db: DatabaseAdapter, data: Invoice) => {
         parentInvoiceId: newId
       });
       if (!ibs.success) {
-        await rollbackOrThrow(db);
         return { success: false, key: ibs.key, message: ibs.message };
       }
     }
 
     const itemsResult = await processItems(
-      db,
       { handleInvoiceItems, handleInvoiceItemSnapshots },
       newId,
       data.invoiceItems
@@ -985,14 +963,10 @@ export const addInvoice = async (db: DatabaseAdapter, data: Invoice) => {
       return { success: false, key: paymentsResult.key, message: paymentsResult.message };
     }
 
-    const attachmentsResult = await processAttachments(db, { handleAttachments }, newId, data.invoiceAttachments);
+    const attachmentsResult = await processAttachments({ handleAttachments }, newId, data.invoiceAttachments);
     if (!attachmentsResult.success) {
       return { success: false, key: attachmentsResult.key, message: attachmentsResult.message };
     }
-
-    const newResult = await getInvoices(db, { id: newId });
-
-    await db.run('COMMIT');
 
     const resultSequence = await processSequence(
       db,
@@ -1005,18 +979,18 @@ export const addInvoice = async (db: DatabaseAdapter, data: Invoice) => {
       }
     );
     if (!resultSequence.success) {
-      await rollbackOrThrow(db);
-      return { success: false, key: result.key };
+      return { success: false, key: resultSequence.key };
     }
+
+    const newResult = await getInvoices(db, { id: newId });
 
     return { success: true, data: newResult.length > 0 ? newResult[0] : newResult };
   } catch (error) {
-    await rollbackOrThrow(db);
-    return { success: false, ...mapDatabaseError(error, db.type) };
+    return { success: false, ...mapDatabaseError(error) };
   }
 };
 
-export const updateInvoice = async (db: DatabaseAdapter, data: Invoice) => {
+export const updateInvoice = async (db: Db, data: Invoice) => {
   const {
     handleInvoice,
     handleInvoicePayments,
@@ -1034,11 +1008,8 @@ export const updateInvoice = async (db: DatabaseAdapter, data: Invoice) => {
   } = createInvoiceHandlers(db);
 
   try {
-    await db.run('BEGIN');
-
     const currentInvoice = await db.get<Invoice>(`SELECT * FROM invoices WHERE "id" = ?`, [data.id]);
     if (!currentInvoice) {
-      await rollbackOrThrow(db);
       return { success: false, key: 'error.invoiceNotFound' };
     }
 
@@ -1046,7 +1017,6 @@ export const updateInvoice = async (db: DatabaseAdapter, data: Invoice) => {
 
     const result = await handleInvoice(formatedData, true);
     if (!result.success || !data.id) {
-      await rollbackOrThrow(db);
       return { success: false, key: result.key };
     }
 
@@ -1059,7 +1029,6 @@ export const updateInvoice = async (db: DatabaseAdapter, data: Invoice) => {
         data.invoiceStyleProfileSnapshot.id != undefined
       );
       if (!ibs.success) {
-        await rollbackOrThrow(db);
         return { success: false, key: ibs.key, message: ibs.message };
       }
     }
@@ -1074,7 +1043,6 @@ export const updateInvoice = async (db: DatabaseAdapter, data: Invoice) => {
         data.invoiceCustomization.id != undefined
       );
       if (!ibs.success) {
-        await rollbackOrThrow(db);
         return { success: false, key: ibs.key, message: ibs.message };
       }
     }
@@ -1087,7 +1055,6 @@ export const updateInvoice = async (db: DatabaseAdapter, data: Invoice) => {
         data.invoiceCurrencySnapshot.id != undefined
       );
       if (!ibs.success) {
-        await rollbackOrThrow(db);
         return { success: false, key: ibs.key, message: ibs.message };
       }
     }
@@ -1100,7 +1067,6 @@ export const updateInvoice = async (db: DatabaseAdapter, data: Invoice) => {
         data.invoiceBankSnapshot.id != undefined
       );
       if (!ibs.success) {
-        await rollbackOrThrow(db);
         return { success: false, key: ibs.key, message: ibs.message };
       }
     } else if (data.bankId == undefined) {
@@ -1116,11 +1082,6 @@ export const updateInvoice = async (db: DatabaseAdapter, data: Invoice) => {
         data.invoiceBusinessSnapshot.id != undefined
       );
       if (!ibs.success) {
-        try {
-          await db.run('ROLLBACK');
-        } catch {
-          throw new Error(`error.rollbackFailed`);
-        }
         return { success: false, key: ibs.key, message: ibs.message };
       }
     }
@@ -1133,11 +1094,6 @@ export const updateInvoice = async (db: DatabaseAdapter, data: Invoice) => {
         data.invoiceClientSnapshot.id != undefined
       );
       if (!ibs.success) {
-        try {
-          await db.run('ROLLBACK');
-        } catch {
-          throw new Error(`error.rollbackFailed`);
-        }
         return { success: false, key: ibs.key, message: ibs.message };
       }
     }
@@ -1150,11 +1106,6 @@ export const updateInvoice = async (db: DatabaseAdapter, data: Invoice) => {
         data.invoiceLayoutSnapshot.id != undefined
       );
       if (!ibs.success) {
-        try {
-          await db.run('ROLLBACK');
-        } catch {
-          throw new Error(`error.rollbackFailed`);
-        }
         return { success: false, key: ibs.key, message: ibs.message };
       }
     }
@@ -1162,7 +1113,6 @@ export const updateInvoice = async (db: DatabaseAdapter, data: Invoice) => {
     await db.run('DELETE FROM invoice_items WHERE "parentInvoiceId" = ?;', [data.id]);
 
     const itemsResult = await processItems(
-      db,
       { handleInvoiceItems, handleInvoiceItemSnapshots },
       data.id,
       data.invoiceItems
@@ -1174,7 +1124,9 @@ export const updateInvoice = async (db: DatabaseAdapter, data: Invoice) => {
     const ids = (data.invoicePayments ?? []).map(p => p.id).filter(Boolean);
     if (ids.length > 0) {
       await db.run(
-        `DELETE FROM invoice_payments WHERE "parentInvoiceId" = ? AND "id" NOT IN (${ids.map(() => '?').join(',')})`,
+        `DELETE FROM invoice_payments WHERE "parentInvoiceId" = ? AND "id" NOT IN (${ids
+          .map(() => '?::bigint')
+          .join(',')})`,
         [data.id, ...ids]
       );
     } else {
@@ -1187,14 +1139,10 @@ export const updateInvoice = async (db: DatabaseAdapter, data: Invoice) => {
     }
 
     await db.run('DELETE FROM attachments WHERE "parentInvoiceId" = ?;', [data.id]);
-    const attachmentsResult = await processAttachments(db, { handleAttachments }, data.id, data.invoiceAttachments);
+    const attachmentsResult = await processAttachments({ handleAttachments }, data.id, data.invoiceAttachments);
     if (!attachmentsResult.success) {
       return { success: false, key: attachmentsResult.key, message: attachmentsResult.message };
     }
-
-    const newResult = await getInvoices(db, { id: data.id });
-
-    await db.run('COMMIT');
 
     const resultSequence = await processSequenceOnUpdate(
       db,
@@ -1210,25 +1158,19 @@ export const updateInvoice = async (db: DatabaseAdapter, data: Invoice) => {
       }
     );
     if (!resultSequence.success) {
-      await rollbackOrThrow(db);
-      return { success: false, key: result.key };
+      return { success: false, key: resultSequence.key };
     }
+
+    const newResult = await getInvoices(db, { id: data.id });
 
     return { success: true, data: newResult.length > 0 ? newResult[0] : newResult };
   } catch (error) {
-    await rollbackOrThrow(db);
-    return { success: false, ...mapDatabaseError(error, db.type) };
+    return { success: false, ...mapDatabaseError(error) };
   }
 };
 
-export const duplicateInvoice = async (
-  db: DatabaseAdapter,
-  invoiceId: number,
-  invoiceType: 'quotation' | 'invoice'
-) => {
+export const duplicateInvoice = async (db: Db, invoiceId: number, invoiceType: 'quotation' | 'invoice') => {
   try {
-    await db.run('BEGIN');
-
     const original = await db.get('SELECT * FROM invoices WHERE "id" = ?;', [invoiceId]);
 
     if (!original) return { success: false };
@@ -1240,10 +1182,6 @@ export const duplicateInvoice = async (
     let convertedFromQuotationId: number | null = original.convertedFromQuotationId as number | null;
     const status: string = InvoiceStatus.unpaid;
     const isQuotationConversion = original.invoiceType === 'quotation' && invoiceType === 'invoice';
-    if (isQuotationConversion) {
-      convertedFromQuotationId = original.id as number;
-      await db.run(`UPDATE invoices SET "status" = 'closed' WHERE "id" = ?;`, [original.id as number]);
-    }
 
     const handleSequences = handleEntity<InvoiceSequence>(db, 'invoice_sequences', invoiceSequencesFields);
     const numberResult = await getDuplicateInvoiceNumber(db, handleSequences, {
@@ -1254,10 +1192,14 @@ export const duplicateInvoice = async (
       targetInvoiceType: invoiceType as InvoiceType
     });
     if (!numberResult.success || numberResult.data === undefined) {
-      await rollbackOrThrow(db);
       return { success: false };
     }
     const newInvoiceNumber = numberResult.data;
+
+    if (isQuotationConversion) {
+      convertedFromQuotationId = original.id as number;
+      await db.run(`UPDATE invoices SET "status" = 'closed' WHERE "id" = ?;`, [original.id as number]);
+    }
 
     const insertInvoiceSQL = `
         INSERT INTO invoices (
@@ -1271,11 +1213,11 @@ export const duplicateInvoice = async (
         )
         SELECT
           ?, ?, "businessId", "clientId", "currencyId",
-          ${getDefaultValue("(datetime('now'))", db.type)},  
-          CASE 
+          NOW(),
+          CASE
             WHEN "dueDate" IS NULL THEN NULL
-            ELSE ${getDefaultValue("date('now','start of month','+2 months','-1 day')", db.type)}
-            END, ?, 0, ?, "customerNotes",
+            ELSE DATE_TRUNC('month', NOW()) + INTERVAL '2 month' - INTERVAL '1 day'
+            END, ?, false, ?, "customerNotes",
           "thanksNotes", "termsConditionNotes", "discountName", "language", 
           "discountType", "discountAmountCents", "discountPercent", "shippingFeeCents",
           "invoicePrefix", "invoiceSuffix", "taxName", "taxRate", "taxType", "signatureData",
@@ -1422,10 +1364,8 @@ export const duplicateInvoice = async (
     } else {
       duplicated = await getInvoices(db, { id: duplicatedRowID });
     }
-    await db.run('COMMIT');
     return { success: true, data: duplicated.length > 0 ? duplicated[0] : duplicated };
   } catch (error) {
-    await rollbackOrThrow(db);
-    return { success: false, ...mapDatabaseError(error, db.type) };
+    return { success: false, ...mapDatabaseError(error) };
   }
 };

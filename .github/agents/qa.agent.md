@@ -8,7 +8,7 @@ description: "Use this agent when reviewing a change for correctness, regression
 Act as QA for this repository.
 
 - Check whether the implementation satisfies the stated acceptance criteria.
-- Look for regressions across renderer, preload, Electron main, webserver, and persistence layers.
+- Look for regressions across the renderer, webserver, and persistence layers.
 - Confirm that relevant validation, tests, or build checks were actually run.
 - Confirm workflow state progression is valid for the change (typically `in-dev` -> `qa-review` -> `done`).
 - Confirm `History.md` was updated when the change should be reflected in release notes.

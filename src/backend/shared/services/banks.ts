@@ -1,5 +1,5 @@
+import type { Db } from '../db/tx';
 import type { Bank } from '../types/bank';
-import type { DatabaseAdapter } from '../types/DatabaseAdapter';
 import type { EntityWithCounts } from '../types/entityWithCounts';
 import type { FilterData } from '../types/invoiceFilter';
 import type { Response } from '../types/response';
@@ -25,10 +25,7 @@ const bankFields: (keyof Bank)[] = [
   'isArchived'
 ];
 
-export const getAllBanks = async (
-  db: DatabaseAdapter,
-  filter?: FilterData[]
-): Promise<Response<(Bank & EntityWithCounts)[]>> => {
+export const getAllBanks = async (db: Db, filter?: FilterData[]): Promise<Response<(Bank & EntityWithCounts)[]>> => {
   const getAll = getAllEntities<Bank>(db, 'banks', 'b', 'i', {
     joins: `
           LEFT JOIN invoices i ON i."bankId" = b."id"
@@ -45,7 +42,7 @@ export const getAllBanks = async (
   return getAll(filter ?? []);
 };
 
-export const addBank = async (db: DatabaseAdapter, data: Bank): Promise<Response<Bank & EntityWithCounts>> => {
+export const addBank = async (db: Db, data: Bank): Promise<Response<Bank & EntityWithCounts>> => {
   const handle = handleEntity<Bank>(db, 'banks', 'b', bankFields, {
     joins: `LEFT JOIN invoices i ON i."bankId" = b."id"`,
     invoiceCountExpr: `
@@ -60,7 +57,7 @@ export const addBank = async (db: DatabaseAdapter, data: Bank): Promise<Response
   return handle(data);
 };
 
-export const updateBank = async (db: DatabaseAdapter, data: Bank): Promise<Response<Bank & EntityWithCounts>> => {
+export const updateBank = async (db: Db, data: Bank): Promise<Response<Bank & EntityWithCounts>> => {
   const handle = handleEntity<Bank>(db, 'banks', 'b', bankFields, {
     joins: `LEFT JOIN invoices i ON i."bankId" = b."id"`,
     invoiceCountExpr: `
@@ -75,16 +72,16 @@ export const updateBank = async (db: DatabaseAdapter, data: Bank): Promise<Respo
   return handle(data, true);
 };
 
-export const deleteBank = async (db: DatabaseAdapter, id: number) => {
+export const deleteBank = async (db: Db, id: number) => {
   try {
     await db.run('DELETE FROM banks WHERE "id" = ?;', [id]);
     return { success: true };
   } catch (error) {
-    return { success: false, ...mapDatabaseError(error, db.type) };
+    return { success: false, ...mapDatabaseError(error) };
   }
 };
 
-export const batchAddBank = async (db: DatabaseAdapter, data: Bank[]) => {
+export const batchAddBank = async (db: Db, data: Bank[]) => {
   const handle = handleEntity<Bank>(db, 'banks', 'b', bankFields, {
     joins: `LEFT JOIN invoices i ON i."bankId" = b."id"`,
     invoiceCountExpr: `
@@ -97,26 +94,14 @@ export const batchAddBank = async (db: DatabaseAdapter, data: Bank[]) => {
         `
   });
   try {
-    await db.run('BEGIN');
     for (const row of data) {
       const result = await handle(row);
       if (!result.success) {
-        try {
-          await db.run('ROLLBACK');
-        } catch {
-          throw new Error(`error.rollbackFailed`);
-        }
         return result;
       }
     }
-    await db.run('COMMIT');
     return { success: true };
   } catch (error) {
-    try {
-      await db.run('ROLLBACK');
-    } catch {
-      throw new Error(`error.rollbackFailed`);
-    }
-    return { success: false, ...mapDatabaseError(error, db.type) };
+    return { success: false, ...mapDatabaseError(error) };
   }
 };

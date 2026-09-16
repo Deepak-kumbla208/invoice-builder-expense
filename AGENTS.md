@@ -16,17 +16,17 @@ Use this workflow for:
 - new features
 - bug fixes
 - UI changes
-- IPC or preload changes
 - backend or webserver changes
 - persistence or migration work
 
 ## Repository map
 
-- Renderer/UI: src/renderer
-- Electron main process: src/backend/main
-- Preload bridge: src/preload/preload.ts
-- Webserver: src/backend/webserver
-- Database and migrations: src/backend/shared
+- Renderer/UI (React SPA): src/renderer
+- Webserver (Express API): src/backend/webserver
+- Services, database layer and SQL migrations: src/backend/shared
+
+The project rules, phase plans and read-first order live in [CLAUDE.md](CLAUDE.md) and
+[docs/plans/STATUS.md](docs/plans/STATUS.md); they take precedence over this document.
 
 ## Default workflow
 
@@ -64,7 +64,6 @@ Rule of thumb:
 ## Good default checks
 
 - UI change: run the relevant test or build path for the renderer.
-- IPC/main process change: build the Electron target.
 - Webserver change: build or run the webserver target.
 - Persistence change: review migration safety and run the relevant build/test path.
 
@@ -116,7 +115,6 @@ Suggested transition gates:
 
 - Prefer the smallest relevant check first, such as a targeted test or build step.
 - If the change affects the UI, run the relevant renderer or app test coverage if available.
-- If the change affects IPC or the main process, validate the build path for Electron.
 - If the change affects data persistence, consider migration safety and schema impact.
 
 ## Team expectations
@@ -127,6 +125,6 @@ Suggested transition gates:
 
 ## When to ask for human input
 
-- Packaging, release, or installer changes.
+- Deployment, Docker, or release changes.
 - Database schema changes that need migration strategy.
 - Large cross-cutting refactors.

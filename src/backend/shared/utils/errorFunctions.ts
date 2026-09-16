@@ -1,17 +1,4 @@
-import { DatabaseType } from '../enums/databaseType';
 import type { DatabaseError } from '../types/databaseError';
-
-const sqliteErrorMap: Record<string, string> = {
-  'UNIQUE constraint failed': 'error.invalidConstraintUnique',
-  'FOREIGN KEY constraint failed': 'error.invalidConstraintForeign',
-  'CHECK constraint failed': 'error.invalidConstraintCheck',
-  'NOT NULL constraint failed': 'error.invalidConstraintNotNull',
-  'datatype mismatch': 'error.datatypeMismatch',
-  'database is locked': 'error.databaseLocked',
-  'file is not a database': 'error.databaseCorrupt',
-  SQLITE_ERROR: 'error.sqlSyntaxError',
-  SQLITE_IOERR: 'error.diskIOError'
-};
 
 const postgresErrorMap: Record<string, string> = {
   '23505': 'error.invalidConstraintUnique',
@@ -26,20 +13,10 @@ export const isDatabaseError = (error: unknown): error is DatabaseError => {
   return error instanceof Error && typeof (error as unknown as { code?: string }).code === 'string';
 };
 
-export const mapDatabaseError = (error: unknown, dbType: DatabaseType): { key: string; message?: string } => {
+export const mapDatabaseError = (error: unknown): { key: string; message?: string } => {
   if (isDatabaseError(error)) {
-    if (dbType === DatabaseType.sqlite) {
-      for (const [snippet, key] of Object.entries(sqliteErrorMap)) {
-        if (error.message.includes(snippet)) {
-          return { key };
-        }
-      }
-    }
-
-    if (dbType === DatabaseType.postgre) {
-      const mapped = postgresErrorMap[error.code];
-      if (mapped) return { key: mapped };
-    }
+    const mapped = postgresErrorMap[error.code];
+    if (mapped) return { key: mapped };
 
     return { key: 'error.unknownError', message: error.message };
   }
