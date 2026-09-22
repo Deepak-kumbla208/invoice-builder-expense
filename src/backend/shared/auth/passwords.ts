@@ -1,8 +1,7 @@
 import { randomInt } from 'crypto';
 import { argon2id, hash, verify } from 'argon2';
 
-export const MIN_PASSWORD_LENGTH = 12;
-export const MAX_PASSWORD_LENGTH = 1024;
+export { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from './passwordPolicy';
 
 let dummyHash: Promise<string> | undefined;
 

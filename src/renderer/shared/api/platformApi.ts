@@ -1,6 +1,23 @@
 import { gzip } from 'pako';
 import type { EInvoice } from '../enums/einvoice';
 import type { InvoiceType } from '../enums/invoiceType';
+import type {
+  AuditPage,
+  AuditQuery,
+  Office,
+  OfficeAdd,
+  OfficeUpdate,
+  PermissionGroup,
+  Role,
+  RoleAdd,
+  RoleUpdate,
+  TemporaryPassword,
+  User,
+  UserAdd,
+  UserCreated,
+  UserUpdate
+} from '../types/admin';
+import type { AuthProfile, ChangePasswordInput, LoginInput } from '../types/auth';
 import type { BankAdd, BankUpdate, BankUpdateWeb, BankWeb } from '../types/bank';
 import type { BusinessAdd, BusinessUpdate, BusinessWeb } from '../types/business';
 import type { Category, CategoryAdd, CategoryUpdate } from '../types/category';
@@ -143,22 +160,76 @@ const baseUrl = (): string => {
   return (import.meta.env.VITE_API_URL as string) || window.location.origin;
 };
 
-const apiGet = async <T>(path: string, params?: Record<string, string>): Promise<T> => {
-  const url = new URL(path, baseUrl());
-  if (params) {
-    Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-  }
-  const res = await fetch(url.toString());
-  return res.json() as Promise<T>;
+interface AuthHandlers {
+  onUnauthorized?: () => void;
+  onMustChangePassword?: () => void;
+}
+
+let csrfToken: string | undefined;
+let authHandlers: AuthHandlers = {};
+
+export const setCsrfToken = (token: string | undefined) => {
+  csrfToken = token;
 };
 
-const apiGetBlob = async (path: string, params?: Record<string, string>): Promise<Response<Uint8Array | undefined>> => {
+export const setAuthHandlers = (handlers: AuthHandlers) => {
+  authHandlers = handlers;
+};
+
+interface RequestOptions {
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  body?: unknown;
+  params?: Record<string, string>;
+  handleAuth?: boolean;
+}
+
+const send = async (path: string, { method = 'GET', body, params, handleAuth = true }: RequestOptions = {}) => {
   const url = new URL(path, baseUrl());
   if (params) {
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   }
 
-  const res = await fetch(url.toString());
+  const headers: Record<string, string> = {};
+  const options: RequestInit = { method, credentials: 'include', headers };
+  if (body instanceof FormData) {
+    options.body = body;
+  } else if (body !== undefined) {
+    headers['Content-Type'] = 'application/json';
+    options.body = JSON.stringify(body);
+  }
+  if (method !== 'GET' && csrfToken) headers['X-CSRF-Token'] = csrfToken;
+
+  const res = await fetch(url.toString(), options);
+  if (handleAuth && res.status === 401) {
+    csrfToken = undefined;
+    authHandlers.onUnauthorized?.();
+  } else if (handleAuth && res.status === 403) {
+    const payload = (await res
+      .clone()
+      .json()
+      .catch(() => undefined)) as { key?: string } | undefined;
+    if (payload?.key === 'auth.mustChangePassword') authHandlers.onMustChangePassword?.();
+  }
+  return res;
+};
+
+const MESSAGE_KEY = /^[a-z][A-Za-z]*\.[A-Za-z.]+$/;
+
+const apiRequest = async <T>(path: string, options?: RequestOptions): Promise<T> => {
+  const res = await send(path, options);
+  const body = await res.json();
+  if (!res.ok && body && typeof body.key === 'string') {
+    const fieldErrors = Object.values((body.errors ?? {}) as Record<string, string[]>).flat();
+    const fieldKey = body.key === 'error.validation' ? fieldErrors.find(error => MESSAGE_KEY.test(error)) : undefined;
+    body.message = fieldKey ?? body.key;
+  }
+  return body as T;
+};
+
+const apiGet = <T>(path: string, params?: Record<string, string>) => apiRequest<T>(path, { params });
+
+const apiGetBlob = async (path: string, params?: Record<string, string>): Promise<Response<Uint8Array | undefined>> => {
+  const res = await send(path, { params });
   if (res.ok) {
     const buffer = await res.arrayBuffer();
     return { success: true, data: new Uint8Array(buffer) } as Response<Uint8Array | undefined>;
@@ -167,36 +238,15 @@ const apiGetBlob = async (path: string, params?: Record<string, string>): Promis
   }
 };
 
-const apiPost = async <T>(path: string, body?: unknown): Promise<T> => {
-  const url = baseUrl() + path;
+const apiPost = <T>(path: string, body?: unknown) => apiRequest<T>(path, { method: 'POST', body });
 
-  const options: RequestInit = { method: 'POST' };
+const apiPut = <T>(path: string, body?: unknown) => apiRequest<T>(path, { method: 'PUT', body });
 
-  if (body instanceof FormData) {
-    options.body = body;
-  } else if (body !== undefined) {
-    options.headers = { 'Content-Type': 'application/json' };
-    options.body = JSON.stringify(body);
-  }
+const apiDelete = <T>(path: string) => apiRequest<T>(path, { method: 'DELETE' });
 
-  const res = await fetch(url, options);
-  return res.json() as Promise<T>;
-};
-
-const apiPut = async <T>(path: string, body?: unknown): Promise<T> => {
-  const url = baseUrl() + path;
-  const res = await fetch(url, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: body !== undefined ? JSON.stringify(body) : undefined
-  });
-  return res.json() as Promise<T>;
-};
-
-const apiDelete = async <T>(path: string): Promise<T> => {
-  const url = baseUrl() + path;
-  const res = await fetch(url, { method: 'DELETE' });
-  return res.json() as Promise<T>;
+const withCsrfToken = (response: Response<AuthProfile>) => {
+  if (response.success && response.data) setCsrfToken(response.data.csrfToken);
+  return response;
 };
 
 export const webApi = () => {
@@ -207,6 +257,45 @@ export const webApi = () => {
       window.open(url, '_blank');
       return Promise.resolve();
     },
+
+    getProfile: async () =>
+      withCsrfToken(await apiRequest<Response<AuthProfile>>('/api/auth/me', { handleAuth: false })),
+    login: async (data: LoginInput) =>
+      withCsrfToken(
+        await apiRequest<Response<AuthProfile>>('/api/auth/login', { method: 'POST', body: data, handleAuth: false })
+      ),
+    logout: async () => {
+      const response = await apiRequest<Response<unknown>>('/api/auth/logout', { method: 'POST', handleAuth: false });
+      setCsrfToken(undefined);
+      return response;
+    },
+    changePassword: (data: ChangePasswordInput) => apiPost<Response<unknown>>('/api/auth/change-password', data),
+
+    getUsers: () => apiGet<Response<User[]>>('/api/users'),
+    addUser: (data: UserAdd) => apiPost<Response<UserCreated>>('/api/users', data),
+    updateUser: ({ id, ...data }: UserUpdate) => apiPut<Response<User>>(`/api/users/${id}`, data),
+    resetUserPassword: (id: number) => apiPost<Response<TemporaryPassword>>(`/api/users/${id}/reset-password`),
+
+    getPermissions: () => apiGet<Response<PermissionGroup[]>>('/api/permissions'),
+    getRoles: () => apiGet<Response<Role[]>>('/api/roles'),
+    addRole: (data: RoleAdd) => apiPost<Response<Role>>('/api/roles', data),
+    updateRole: ({ id, ...data }: RoleUpdate) => apiPut<Response<Role>>(`/api/roles/${id}`, data),
+    deleteRole: (id: number) => apiDelete<Response<unknown>>(`/api/roles/${id}`),
+
+    getOffices: () => apiGet<Response<Office[]>>('/api/offices'),
+    addOffice: (data: OfficeAdd) => apiPost<Response<Office>>('/api/offices', data),
+    updateOffice: ({ id, businessId: _businessId, ...data }: OfficeUpdate) =>
+      apiPut<Response<Office>>(`/api/offices/${id}`, data),
+
+    getAuditLogs: (query: AuditQuery) =>
+      apiGet<Response<AuditPage>>(
+        '/api/audit-logs',
+        Object.fromEntries(
+          Object.entries(query)
+            .filter(([, value]) => value !== undefined && value !== '')
+            .map(([key, value]) => [key, String(value)])
+        )
+      ),
 
     getAllSettings: () => apiGet<Response<Settings>>('/api/settings'),
     updateSettings: (data: SettingsUpdate) => apiPut<Response<SettingsUpdate>>('/api/settings', data),
@@ -258,8 +347,6 @@ export const webApi = () => {
           : response.data
       };
     },
-    deleteBusiness: (id: number) => apiDelete<Response<unknown>>(`/api/businesses/${id}`),
-    addBatchBusiness: (data: BusinessAdd[]) => apiPost<Response<BusinessWeb[]>>('/api/businesses/batch', data),
 
     getAllStyleProfiles: async (filter?: FilterData[]) => {
       const response = await apiGet<Response<StyleProfileWeb[]>>(

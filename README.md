@@ -85,6 +85,10 @@ The script only runs against an empty data directory: for a volume created befor
 | `npm run test:e2e`  | Playwright end-to-end tests                        |
 | `npm run build`     | Production `dist-fe` and `dist-be`                 |
 
+The e2e specs sign in as a Super Admin they create with the admin CLI, so they need
+`E2E_MIGRATION_DATABASE_URL` (an `app_owner` URL for the database the API uses); without it they are skipped.
+The invoice regression spec expects an empty invoice list.
+
 ## 🐳 Running the stack
 
 `docker compose up` runs four services: `db` (PostgreSQL 17, internal network only), a one-shot

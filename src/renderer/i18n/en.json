@@ -27,6 +27,51 @@
     "search": "Search",
     "uploadImage": "Upload image"
   },
+  "auditLog": {
+    "action": "Action",
+    "actor": "User",
+    "after": "After",
+    "before": "Before",
+    "details": "Show details",
+    "empty": "No audit entries match these filters.",
+    "entity": "Record",
+    "filterAction": "Action",
+    "filterEntity": "Record type",
+    "request": "IP {{ip}} · request {{requestId}}",
+    "scope": "Office or company",
+    "system": "System",
+    "time": "Time"
+  },
+  "auth": {
+    "accountMenu": "Account",
+    "changePassword": "Change password",
+    "changePasswordForced": "Your password was set by an administrator. Choose a new one to continue.",
+    "changePasswordTitle": "Change your password",
+    "confirmPassword": "Confirm new password",
+    "credentialsRequired": "Enter your email and password.",
+    "csrfInvalid": "Your session is out of date. Reload the page and try again.",
+    "currentPassword": "Current password",
+    "email": "Email",
+    "forbidden": "You don't have permission to do that.",
+    "forgotPassword": "Forgot password? Contact your office admin.",
+    "invalidCredentials": "The email or password is incorrect.",
+    "invalidCurrentPassword": "The current password is incorrect.",
+    "mustChangePassword": "Change your password to continue.",
+    "newPassword": "New password",
+    "originInvalid": "Sign-in was blocked because the request came from another site.",
+    "password": "Password",
+    "passwordChanged": "Your password has been changed.",
+    "passwordTooShort": "At least {{min}} characters.",
+    "passwordUnchanged": "The new password must be different from the current one.",
+    "passwordsDontMatch": "The passwords don't match.",
+    "serverUnavailable": "Can't reach the server. Check your connection and try again.",
+    "signIn": "Sign in",
+    "signInTitle": "Sign in",
+    "signOut": "Sign out",
+    "temporaryPasswordExpired": "Your temporary password has expired. Ask your office admin for a new one.",
+    "tooManyAttempts": "Too many sign-in attempts. Wait 15 minutes and try again.",
+    "unauthenticated": "Your session has ended. Sign in again."
+  },
   "banks": {
     "add": "Add bank",
     "filter": {
@@ -49,27 +94,30 @@
     "noItem": "Selected a bank to view details."
   },
   "businesses": {
-    "add": "Add business",
+    "add": "Add company",
     "filter": {
-      "activeDesc": "Businesses that are not archived",
-      "activeText": "Active businesses",
-      "allText": "All businesses",
-      "archivedDesc": "Businesses that have been archived",
-      "archivedText": "Archived businesses",
-      "atleastOneInvoiceDesc": "Businesses which has at least one invoice",
-      "atleastOneInvoiceText": "Businesses who have invoices",
+      "activeDesc": "Companies that are not archived",
+      "activeText": "Active companies",
+      "allText": "All companies",
+      "archivedDesc": "Companies that have been archived",
+      "archivedText": "Archived companies",
+      "atleastOneInvoiceDesc": "Companies which has at least one invoice",
+      "atleastOneInvoiceText": "Companies who have invoices",
       "noInvoices30Desc": "No invoices in the last 30 days",
-      "noInvoices30Text": "Inactive businesses (30 days)",
+      "noInvoices30Text": "Inactive companies (30 days)",
       "noInvoices60Desc": "No invoices in the last 60 days",
-      "noInvoices60Text": "Inactive businesses (60 days)",
+      "noInvoices60Text": "Inactive companies (60 days)",
       "noInvoices90Desc": "No invoices in the last 90 days",
-      "noInvoices90Text": "Inactive businesses (90 days)",
-      "noInvoicesDesc": "Businesses with no invoices",
-      "noInvoicesText": "Businesses who do not have invoices"
+      "noInvoices90Text": "Inactive companies (90 days)",
+      "noInvoicesDesc": "Companies with no invoices",
+      "noInvoicesText": "Companies who do not have invoices"
     },
-    "noItem": "Selected a business to view details.",
+    "legalName": "Legal name",
+    "noItem": "Selected a company to view details.",
+    "pan": "PAN",
+    "panHelper": "10 characters, for example AAAAA9999A",
     "role": "Role",
-    "title": "Business",
+    "title": "Company",
     "website": "Website"
   },
   "categories": {
@@ -279,6 +327,10 @@
     "vatCode": "VAT code",
     "watermark": "Watermark"
   },
+  "company": {
+    "createRequiresAllOffices": "Only users with access to all offices can add companies.",
+    "panInvalid": "Enter a valid PAN, for example AAAAA9999A."
+  },
   "currencies": {
     "add": "Add currency",
     "code": "Symbol text",
@@ -305,12 +357,46 @@
     "symbol": "Symbol"
   },
   "customizeInvoice": {
-    "includeBusinessName": "Include business name",
+    "includeBusinessName": "Include company name",
     "includeMonth": "Include month",
     "includeYear": "Include year",
     "lettersAndNumbers": "Only letters and numbers allowed"
   },
+  "dashboard": {
+    "done": "Done",
+    "go": "Open",
+    "placeholder": "Your dashboard will show invoices, expenses and reimbursements here. Use the menu to get started.",
+    "setupComplete": "Setup is complete. Your dashboard widgets will appear here.",
+    "setupProgress": "{{done}} of {{total}} done",
+    "setupSubtitle": "Finish these steps before your team starts invoicing.",
+    "setupTitle": "Set up your organisation",
+    "steps": {
+      "bank": {
+        "description": "Bank details printed on invoices.",
+        "title": "Add a bank account"
+      },
+      "company": {
+        "description": "Legal name, PAN and logo.",
+        "title": "Add a company"
+      },
+      "customers": {
+        "description": "Who you invoice and what you sell.",
+        "title": "Add customers and items"
+      },
+      "office": {
+        "description": "Offices issue invoices, so each needs a GSTIN.",
+        "title": "Add an office with a GSTIN"
+      },
+      "users": {
+        "description": "Invite office admins and staff, and choose their roles.",
+        "title": "Add users"
+      }
+    },
+    "todo": "Not done",
+    "welcome": "Welcome, {{name}}"
+  },
   "error": {
+    "conflict": "This change conflicts with the current data. Reload and try again.",
     "connectionFailed": "Connection failed",
     "databaseCorrupt": "Database file is corrupt.",
     "databaseCreationFailed": "Database creation/connection failed",
@@ -345,9 +431,10 @@
     "noPrinterAvailable": "No printer is available. Please connect or configure a printer and try again.",
     "noUpFunction": "Migration does not export up()",
     "noWorksheetFound": "No worksheet found",
-    "peppolBusinessCC": "Business country code is required for PEPPOL-compliant invoices",
-    "peppolBusinessSchema": "Business peppol endpoint id and schema id is required for PEPPOL-compliant invoices",
-    "peppolBusinessVATCode": "Business VAT or code is required for PEPPOL-compliant invoices",
+    "notFound": "This record doesn't exist or you no longer have access to it.",
+    "peppolBusinessCC": "Company country code is required for PEPPOL-compliant invoices",
+    "peppolBusinessSchema": "Company peppol endpoint id and schema id is required for PEPPOL-compliant invoices",
+    "peppolBusinessVATCode": "Company VAT or code is required for PEPPOL-compliant invoices",
     "peppolClientCC": "Client country code is required for PEPPOL-compliant invoices",
     "peppolClientReference": "Client buyer reference is required for PEPPOL-compliant invoices",
     "peppolClientSchema": "Client peppol endpoint id and schema id is required for PEPPOL-compliant invoices",
@@ -363,11 +450,12 @@
     "unknownError": "Unknown database error",
     "unsupportedImage": "Unsupported image type",
     "unsupportedValue": "Unsupported value type for key",
-    "xrechnungBusinessCC": "Business country code is required for XRechnung-compliant invoices",
-    "xrechnungBusinessEmail": "Business email is required for XRechnung-compliant invoices",
-    "xrechnungBusinessPhone": "Business phone is required for XRechnung-compliant invoices",
-    "xrechnungBusinessSchema": "Business ID and ID schema are required for XRechnung-compliant invoices",
-    "xrechnungBusinessVATCode": "Business VAT ID or Tax Number is required for XRechnung-compliant invoices",
+    "validation": "Some fields are invalid. Check the form and try again.",
+    "xrechnungBusinessCC": "Company country code is required for XRechnung-compliant invoices",
+    "xrechnungBusinessEmail": "Company email is required for XRechnung-compliant invoices",
+    "xrechnungBusinessPhone": "Company phone is required for XRechnung-compliant invoices",
+    "xrechnungBusinessSchema": "Company ID and ID schema are required for XRechnung-compliant invoices",
+    "xrechnungBusinessVATCode": "Company VAT ID or Tax Number is required for XRechnung-compliant invoices",
     "xrechnungClientAddress": "Client address is required for XRechnung-compliant invoices",
     "xrechnungClientCC": "Client country code is required for XRechnung-compliant invoices",
     "xrechnungClientReference": "The Leitweg-ID (Buyer Reference) is required for XRechnung-compliant invoices",
@@ -540,7 +628,7 @@
   },
   "menuItems": {
     "banks": "Banks",
-    "businesses": "Businesses",
+    "businesses": "Companies",
     "categories": "Categories",
     "clients": "Clients",
     "currencies": "Currencies",
@@ -553,6 +641,70 @@
     "settings": "Settings",
     "styleProfiles": "Style Profiles",
     "units": "Units"
+  },
+  "nav": {
+    "administration": "Administration",
+    "allInvoices": "All invoices",
+    "auditLog": "Audit log",
+    "banks": "Banks",
+    "categories": "Categories",
+    "companies": "Companies",
+    "currencies": "Currencies",
+    "customers": "Customers",
+    "dashboard": "Dashboard",
+    "invoiceSetup": "Invoice setup",
+    "invoices": "Invoices",
+    "items": "Items",
+    "layouts": "Layouts",
+    "offices": "Offices",
+    "presets": "Presets",
+    "quotes": "Quotes",
+    "reports": "Reports",
+    "roles": "Roles & permissions",
+    "settings": "Settings",
+    "styleProfiles": "Style profiles",
+    "units": "Units",
+    "users": "Users"
+  },
+  "noAccess": {
+    "backToDashboard": "Back to dashboard",
+    "backToList": "Back to list",
+    "page": "You don't have access to this page.",
+    "record": "This record doesn't exist or you no longer have access to it."
+  },
+  "office": {
+    "codeInvalid": "Use 2 or 3 capital letters or digits.",
+    "codeTaken": "Another office in this company already uses this code.",
+    "companyArchived": "The company is archived, so offices can't be added to it.",
+    "companyNotFound": "Choose a company.",
+    "createRequiresAllOffices": "Only users with access to all offices can add offices.",
+    "gstinInvalid": "Enter a valid 15-character GSTIN that starts with the state code.",
+    "lutIncomplete": "Enter both the LUT reference and the date it is valid until.",
+    "lutRequiresGstin": "A LUT needs a GSTIN.",
+    "stateCodeInvalid": "Choose a state."
+  },
+  "offices": {
+    "add": "Add office",
+    "address": "Address",
+    "code": "Code",
+    "codeHelper": "2–3 letters or digits, used in invoice numbers",
+    "company": "Company",
+    "companyFixed": "The company can't be changed after the office is created.",
+    "email": "Email",
+    "gstin": "GSTIN",
+    "gstinHelper": "Needed before this office can issue invoices",
+    "lutHelper": "Letter of Undertaking for exports without IGST",
+    "lutReference": "LUT reference",
+    "lutValidUntil": "LUT valid until",
+    "name": "Name",
+    "noGstin": "No GSTIN",
+    "noItem": "Select an office to view details.",
+    "phone": "Phone",
+    "state": "State",
+    "title": "Office"
+  },
+  "permission": {
+    "unknown": "One of the permissions is not recognised."
   },
   "presets": {
     "add": "Add preset",
@@ -601,6 +753,35 @@
     "topClients": "Top clients by revenue",
     "topItems": "Top items by sales",
     "totalInvoices": "{{count}} Invoices"
+  },
+  "role": {
+    "cannotGrant": "You can't grant permissions you don't have.",
+    "inUse": "This role is assigned to users, so it can't be deleted.",
+    "nameTaken": "Another role already has this name.",
+    "system": "The Super Admin role can't be deleted.",
+    "systemLocked": "The Super Admin role's permissions can't be changed."
+  },
+  "roles": {
+    "add": "Add role",
+    "affects_one": "Affects {{count}} user",
+    "affects_other": "Affects {{count}} users",
+    "confirmAffects_one": "This change affects {{count}} user. Save it?",
+    "confirmAffects_other": "This change affects {{count}} users. Save it?",
+    "description": "Description",
+    "fromRole": "from role",
+    "name": "Name",
+    "noItem": "Select a role to view details.",
+    "notGrantable": "You can't grant this permission.",
+    "permissionCount_one": "{{count}} permission",
+    "permissionCount_other": "{{count}} permissions",
+    "permissions": "Permissions",
+    "permissionsHelper": "Ticking a permission also ticks the permissions it needs.",
+    "requires": "Needs: {{permissions}}",
+    "system": "System role",
+    "systemLocked": "This is the system role. Its permissions can't be changed.",
+    "title": "Role",
+    "userCount_one": "{{count}} user",
+    "userCount_other": "{{count}} users"
   },
   "settingsMenuItems": {
     "descriptions": {
@@ -687,5 +868,49 @@
       "noInvoicesText": "Units who do not have invoices"
     },
     "noItem": "Selected a unit to view details."
+  },
+  "user": {
+    "cannotChangeOwnAccess": "You can't change your own role, offices, status or permissions.",
+    "cannotGrant": "You can't grant permissions you don't have.",
+    "cannotSetAllOffices": "Only users with access to all offices can give that access.",
+    "emailInvalid": "Enter a valid email address.",
+    "emailTaken": "Another user already has this email.",
+    "lastSuperAdmin": "This is the last active Super Admin, so it can't be deactivated or changed.",
+    "officeNotFound": "One of the offices no longer exists.",
+    "officeOutsideScope": "You can only assign offices you have access to.",
+    "officesRequired": "Choose at least one office.",
+    "outsideScope": "You can't manage this user.",
+    "roleNotFound": "Choose a role.",
+    "useChangePassword": "Use Change password to change your own password."
+  },
+  "users": {
+    "active": "Active",
+    "add": "Add user",
+    "allOffices": "All offices",
+    "allOfficesHelper": "Gives access to every office, including offices added later.",
+    "copied": "Copied to the clipboard.",
+    "copy": "Copy password",
+    "done": "Done",
+    "email": "Email",
+    "extraPermissions": "Extra permissions",
+    "extraPermissionsHelper": "Permissions from the {{role}} role are ticked and greyed out. Tick more to grant them to this user only.",
+    "fullName": "Full name",
+    "inactive": "Inactive",
+    "lastLogin": "Last sign-in",
+    "mustChange": "Must change password",
+    "never": "Never",
+    "noItem": "Select a user to view details.",
+    "noOffices": "No offices",
+    "offices": "Offices",
+    "officesHelper": "The user sees records from these offices only.",
+    "ownAccess": "You can't change your own role, offices, status or permissions.",
+    "resetConfirm": "Reset the password for {{name}}? They will be signed out and must use the new temporary password.",
+    "resetPassword": "Reset password",
+    "role": "Role",
+    "roleCannotAssign": "Includes permissions you don't have",
+    "selectRoleFirst": "Choose a role to see its permissions.",
+    "tempPasswordText": "Give this temporary password to {{name}}. It is shown only once and expires in 24 hours. They must change it when they sign in.",
+    "tempPasswordTitle": "Temporary password",
+    "title": "User"
   }
 }

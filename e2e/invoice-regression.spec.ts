@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import fs from 'fs';
+import { canCreateSuperAdmin, createSuperAdmin, signIn } from './helpers/auth';
 
-const apiBaseUrl = 'http://127.0.0.1:3013';
 const stamp = Date.now();
 const names = {
   business: `Regression Co ${stamp}`,
@@ -109,9 +109,14 @@ const setInvoiceNumber = async (page: Page, invoiceNumber: string) => {
 };
 
 test('invoice regression: create, edit, duplicate and export a PDF', async ({ page }) => {
-  test.slow();
+  test.skip(!canCreateSuperAdmin(), 'needs E2E_MIGRATION_DATABASE_URL to create a Super Admin');
+  test.setTimeout(180_000);
 
-  await addEntity(page, '/businesses', 'Add business', async form => {
+  const admin = createSuperAdmin();
+  await signIn(page, admin.email, admin.password);
+  await expect(page.getByRole('heading', { name: `Welcome, ${admin.name}` })).toBeVisible();
+
+  await addEntity(page, '/companies', 'Add company', async form => {
     await dialog(form).getByRole('textbox', { name: 'Name', exact: true }).fill(names.business);
     await dialog(form).getByRole('textbox', { name: 'Short name' }).fill('RC');
     await dialog(form).getByRole('textbox', { name: 'Address' }).fill('1 Street, City, Region 1, IN');
@@ -158,7 +163,7 @@ test('invoice regression: create, edit, duplicate and export a PDF', async ({ pa
     .getByRole('button', { name: new RegExp(names.bank) })
     .first()
     .click();
-  await button(page, 'BUSINESS *').click();
+  await button(page, 'COMPANY *').click();
   await page
     .getByRole('button', { name: new RegExp(names.business) })
     .first()
@@ -231,8 +236,10 @@ test('invoice regression: create, edit, duplicate and export a PDF', async ({ pa
   await dialog(page).getByText('Duplicate', { exact: true }).click();
   await page.waitForTimeout(2500);
 
-  const response = await page.request.get(`${apiBaseUrl}/api/invoices?type=invoice`);
-  const body = (await response.json()) as { data: Array<{ invoiceNumber: string; clientId: number }> };
+  const body = await page.evaluate(async () => {
+    const response = await fetch('/api/invoices?type=invoice');
+    return (await response.json()) as { data: Array<{ invoiceNumber: string; clientId: number }> };
+  });
   const numbers = body.data.map(invoice => invoice.invoiceNumber).sort();
   expect(numbers).toEqual(['1', '2']);
 });

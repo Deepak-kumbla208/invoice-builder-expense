@@ -26,7 +26,7 @@
 ## Current
 
 - **Active phase:** 1 (branch `phase-1-access`)
-- **Next task:** 1.7, per `docs/plans/phase-1-access.md`
+- **Next task:** 1.8, per `docs/plans/phase-1-access.md`
 - **Blockers:** none (note: host port 5432 is held by an unrelated `i-ticket-postgres-1` container, so the dev database is unreachable until that port is freed or remapped; a data volume created before 1.1 has no `app_owner`/`app_user` until it is recreated, see `phase-1-notes.md`)
 
 ### Phase 0 gate (2026-09-16)
@@ -47,6 +47,11 @@ New feature tests and RLS/IDOR/permission tests do not apply to Phase 0.
 ## Session log
 
 <!-- newest first, ≤10 lines per session: date · tasks done · checks run/results · next · blockers -->
+
+- 2026-09-22 · 1.7 done: login, forced/voluntary password change, no-access page; `authSlice` + CSRF/401/must-change handling in `platformApi.ts`; `navConfig.ts` drives the sidebar (design §9, Invoice setup nested under Administration) and every route guard; admin pages Users (temp password shown once, reset, extra grants "from role"), Roles & permissions (auto-ticked dependencies, "Affects N users" confirm), Offices, Audit log; Companies = old Businesses page (no delete/import, + legal name/PAN, `/companies`); dashboard setup checklist
+- 1.7 fix: signing out left `returnTo` at the previous user's page (found by e2e); explicit sign-out now goes to plain `/login`. All English "Business" wording → "Company"
+- 1.7 check: prettier/lint/typecheck clean, `npm run build` green, `npm test` 21 files 158/158 (new: nav, permission logic, API client auth, shell/grid components); `npm run test:e2e` 3/3 on a scratch DB with `E2E_MIGRATION_DATABASE_URL` (new `auth-shell.spec.ts`; invoice regression passes again, as Super Admin)
+- 1.7 flakes: v2 PDF multi-page test given 20 s (fails on the 1.6 baseline under load too); `admin.api.spec` login-limiter race under full-suite load, flagged, not fixed. Details in `phase-1-notes.md`
 
 - 2026-09-22 · 1.6 done: admin APIs, all zod-validated and audited in the request transaction — companies (`/api/businesses`, archive-only, `DELETE`/`batch` removed), `/api/offices` (GSTIN/state/LUT rules, `gstStates.ts`), `/api/roles` + `/api/permissions` (closed sets, system role locked, `affectedUsers`), `/api/users` (temp password 24 h, anti-escalation, revocation rules, last Super Admin), `/api/audit-logs` (paged); `0005-access-admin.sql`
 - 1.6 change: `*.view_all` now `includes` the own-records key in effective permissions (the seeded Office Admin otherwise couldn't assign the User role)

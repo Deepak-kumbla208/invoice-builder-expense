@@ -127,3 +127,32 @@
 - **Audit rows for users** (`user.create`, `user.update`, `user.password_reset`) are scoped to the user's lowest office id, or are global for all-offices users. That way an Office Admin with `audit.view` sees changes in their office. No hashes are ever written to the log.
 - **Audit log:** `GET /api/audit-logs` (`audit.view`) is paged, newest first. It filters by `action`, `entityType`, `entityId` or `actorUserId`, is scoped by RLS, and includes the actor's name and email. Ids are returned as numbers.
 - `AppError` moved to `shared/errors.ts`, so services can throw it; the middleware maps it to a response.
+
+## Task 1.7 decisions
+
+- **Routes and navigation.** `app/navConfig.ts` is the single source for the sidebar and for each route's permission rule; `app/routes.tsx` guards every page with `<RequirePermission rule={navRuleFor(path)}>`, and `navConfig.test.ts` fails if a nav item has no route or rule.
+  - Existing pages keep their paths, except `/businesses`, which is now `/companies`. New: `/` (dashboard), `/login`, `/change-password`, `/users`, `/roles`, `/offices`, `/audit-log`. Any other path shows the no-access page.
+  - The menu follows design §9 without items from later phases (Create invoice, Credit notes, Expenses, Reimbursements, report sub-pages, Expense categories). Reports stays one item until Phase 5. Invoice setup is a nested group under Administration and includes the existing item categories.
+  - Feature flags still hide Quotes, Reports, Presets and Style profiles from the menu without blocking the routes, as before. Settings now needs `admin.settings`. A group with one visible child is shown as that child, under the group's label.
+- **Auth state.** `authSlice` holds the status, user, permissions, offices, companies and a `signedOut` flag. The CSRF token lives in a module variable in `platformApi.ts`, set from login or `/me` and cleared on logout or a 401. `AuthRoot` loads `/api/auth/me` once on start.
+  - A 401 from any call except login, `/me` and logout clears the auth state, and `RequireAuth` redirects to `/login?returnTo=…`. A 403 `auth.mustChangePassword` flips the flag, and `RequireAuth` sends the user to the forced change page.
+  - **Bug found by the e2e spec and fixed:** signing out used to leave `returnTo` pointing at the previous user's page, so the next person to sign in landed there. An explicit sign-out now sets `signedOut`, and the guard redirects to plain `/login`.
+  - `returnTo` only accepts same-app paths and never points back to `/login` or `/change-password`.
+- **Errors.** For non-2xx JSON responses the client sets `message` to the error key (or the first field key of a validation error), so the existing toasts translate them. `error.notFound` uses the U3 wording.
+- **Admin pages** reuse `CRUDPage` through two new helpers, `useApiQuery` and `useApiMutation`. Callers must pass stable functions, or the mutation effects fire twice. Forms memoise their output object, because a new object on every render makes `PageAppBar` loop. Users and Roles add inline, since their forms are wide. Required-field errors appear once a field is touched.
+- **Users:** the temporary password is shown once after create and after reset, with a copy button; the dialog doesn't close on a backdrop click.
+  - When editing yourself, role, offices, active and grants are locked (the server forbids them).
+  - Roles containing permissions the editor lacks are disabled in the role picker.
+  - Office choices come from `/me` (RLS-scoped). The profile is refreshed after company or office saves.
+- **Roles:** ticking a permission ticks what it needs; unticking removes what depends on it. Permissions the editor can't grant are disabled. Changing the permissions of a role that has users shows an "Affects N users" warning and asks for confirmation. The system role is read-only and can't be deleted.
+- **Companies:** the form adds legal name and PAN. The delete button and the XLSX import are gone, since their routes were removed in 1.6. Add is shown only to all-offices users. Every English "Business" string is now "Company"; the other locales are unchanged.
+- **Dashboard:** a placeholder, plus a setup checklist (Company → Office with GSTIN → Bank → Users (more than one active) → Customers & items) computed from list counts. It is shown to users with `admin.companies`, `admin.offices`, `admin.users`, `admin.invoice_setup` and `customer.view`.
+- **Audit log page:** a paged table with action and record-type filters and before/after JSON.
+- `MIN_PASSWORD_LENGTH` and `MAX_PASSWORD_LENGTH` moved to the import-free `shared/auth/passwordPolicy.ts`, so the renderer can use them.
+- **E2E:** `e2e/helpers/auth.ts` creates a Super Admin through the CLI (it needs `E2E_MIGRATION_DATABASE_URL`, and specs skip without it) and signs in.
+  - The new `auth-shell.spec.ts` covers: returnTo, a wrong password, company, office (GSTIN check), a user with a temporary password, sign-out, the forced change, the User role's menu, the no-access page, and signing in again.
+  - The invoice regression and layouts specs now sign in first. They also use `/companies` and `COMPANY *`, with timeouts of 180 s and 60 s.
+- **Test flakes:**
+  - The v2 PDF multi-page test now has a 20 s timeout. It takes 2.3 s alone but more than 5 s under the parallel suite, and it failed on the untouched 1.6 baseline too.
+  - `admin.api.spec.ts` sometimes fails under full-suite load, apparently because the "skip successful requests" login limiter decrements after the next login arrives. It passes on its own. Flagged separately, not fixed here.
+- **Not in 1.7:** the office switcher and the mobile drawer (Phase 4); hiding write buttons from read-only users inside pages (the server enforces this); the invoice XLSX export sheet still called "Business Snapshots" (1.8 reworks import/export).

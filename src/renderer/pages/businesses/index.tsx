@@ -1,9 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { CRUDPage } from '../../shared/components/layout/crudPage/CRUDPage';
+import { useRefreshProfile } from '../../shared/hooks/auth/useAuthActions';
 import { FilterType } from '../../shared/enums/filterType';
 import { useBusinessAdd } from '../../shared/hooks/businesses/useBusinessAdd';
-import { useBusinessAddBatch } from '../../shared/hooks/businesses/useBusinessAddBatch';
-import { useBusinessDelete } from '../../shared/hooks/businesses/useBusinessDelete';
 import { useBusinessesRetrieve } from '../../shared/hooks/businesses/useBusinessesRetrieve';
 import { useBusinessUpdate } from '../../shared/hooks/businesses/useBusinessUpdate';
 import type { Business, BusinessAdd, BusinessUpdate } from '../../shared/types/business';
@@ -12,11 +11,21 @@ import type { Filter, FilterData } from '../../shared/types/filter';
 import type { Response } from '../../shared/types/response';
 import { createCommonFilters, createInvoiceFilters } from '../../shared/utils/filterSortFunctions';
 import { isBusinessFromData } from '../../shared/utils/typeGuardFunctions';
+import { useAppSelector } from '../../state/configureStore';
+import { selectAuthUser } from '../../state/authSlice';
 import { Form } from './Form';
 import { List } from './List';
 
 export const BusinessesPage = () => {
   const { t } = useTranslation();
+  const user = useAppSelector(selectAuthUser);
+  const refreshProfile = useRefreshProfile();
+  const refreshAfter =
+    <T,>(onDone?: (data: Response<T>) => void) =>
+    (data: Response<T>) => {
+      if (data.success) refreshProfile();
+      onDone?.(data);
+    };
   const excelColumns = [
     'name',
     'shortName',
@@ -93,18 +102,7 @@ export const BusinessesPage = () => {
     return useBusinessAdd({
       business: args.item,
       immediate: args.immediate,
-      onDone: args.onDone
-    });
-  };
-  const useBusinessesCRUDAddBatch = (args: {
-    item?: BusinessAdd[];
-    immediate?: boolean;
-    onDone?: (data: Response<BusinessAdd[]>) => void;
-  }) => {
-    return useBusinessAddBatch({
-      businesses: args.item,
-      immediate: args.immediate,
-      onDone: args.onDone
+      onDone: refreshAfter(args.onDone)
     });
   };
   const useBusinessCRUDUpdate = (args: {
@@ -115,7 +113,7 @@ export const BusinessesPage = () => {
     return useBusinessUpdate({
       business: args.item,
       immediate: args.immediate,
-      onDone: args.onDone
+      onDone: refreshAfter(args.onDone)
     });
   };
 
@@ -125,19 +123,19 @@ export const BusinessesPage = () => {
       title={t('businesses.title')}
       filters={filters}
       excelData={{ excelColumns, excelFileName, excelFormat: 'xlsx', excelTemplateData }}
+      showOnlyExport
       useRetrieve={useBusinessesCRUDRetrieve}
       useAdd={useBusinessCRUDAdd}
-      useAddBatch={useBusinessesCRUDAddBatch}
       useUpdate={useBusinessCRUDUpdate}
-      useDelete={useBusinessDelete}
       searchField={'name'}
       sortOptions={[
         { label: t('common.name'), value: 'name' },
         { label: t('common.lastUpdate'), value: 'updatedAt' }
       ]}
-      noItemButtonText={t('businesses.add')}
+      showAddButton={Boolean(user?.allOffices)}
+      noItemButtonText={user?.allOffices ? t('businesses.add') : undefined}
       noItemText={t('businesses.noItem')}
-      leftTitle={t('menuItems.businesses')}
+      leftTitle={t('nav.companies')}
       validateAndNormalize={async data => {
         if (!isBusinessFromData(data)) return;
         return data;
@@ -147,6 +145,7 @@ export const BusinessesPage = () => {
           key={item.id}
           item={item}
           selectedItem={selectedItem}
+          showDeleteButton={false}
           onEdit={(editItem: Business) => onEdit(editItem)}
           onDelete={(id: number) => onDelete(id)}
         />
