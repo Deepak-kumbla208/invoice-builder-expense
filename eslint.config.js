@@ -52,5 +52,16 @@ export default [
         version: 'detect'
       }
     }
+  },
+  {
+    files: ['src/backend/shared/auth/permissions.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [{ group: ['*'], message: 'The renderer imports this file through @shared; keep it import-free.' }]
+        }
+      ]
+    }
   }
 ];

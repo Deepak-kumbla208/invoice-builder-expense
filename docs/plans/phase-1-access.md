@@ -34,7 +34,7 @@
 
 ### 1.3 RLS helpers and policies (access tables)
 
-- `migrations/0003-rls-access.sql`:
+- `migrations/0004-rls-access.sql` (0003 is the 1.2 permission seed):
   - `STABLE SECURITY DEFINER` helpers `app_user_id()`, `app_office_ids() → int[]`, `app_business_ids() → int[]` and `app_all_offices() → bool`. They read `current_setting('app.*', true)` and treat NULL or `''` as empty. Each has a pinned `search_path` and `REVOKE FROM PUBLIC`.
   - `ENABLE` + `FORCE ROW LEVEL SECURITY` on `businesses`, `offices`, `users`, `user_offices`, `user_permissions`, `audit_logs`, `notifications`.
   - Separate SELECT, INSERT, UPDATE and DELETE policies (USING + WITH CHECK) per design §6.2, §7.1 and review S4.

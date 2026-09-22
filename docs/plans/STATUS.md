@@ -26,7 +26,7 @@
 ## Current
 
 - **Active phase:** 1 (branch `phase-1-access`)
-- **Next task:** 1.2, per `docs/plans/phase-1-access.md`
+- **Next task:** 1.3, per `docs/plans/phase-1-access.md` (its migration is now `0004-rls-access.sql`)
 - **Blockers:** none (note: host port 5432 is held by an unrelated `i-ticket-postgres-1` container, so the dev database is unreachable until that port is freed or remapped; a data volume created before 1.1 has no `app_owner`/`app_user` until it is recreated, see `phase-1-notes.md`)
 
 ### Phase 0 gate (2026-09-16)
@@ -47,6 +47,9 @@ New feature tests and RLS/IDOR/permission tests do not apply to Phase 0.
 ## Session log
 
 <!-- newest first, ≤10 lines per session: date · tasks done · checks run/results · next · blockers -->
+
+- 2026-09-22 · 1.2 done: `shared/auth/permissions.ts` (32 keys from design §7.1 with group, label, sortOrder, `requires`; `resolveDependencies`, `isPermissionKey`), `0003-permissions.sql` seeds permissions + Super Admin (system, all), Office Admin (§7.1 + `admin.users` for A8 + `credit_note.create`, user ruling), User; renderer reaches the map through the new `@shared` alias; ESLint forbids imports in the map
+- 1.2 check: `permissions.sync.spec.ts` (DB rows = map, exact seeded role sets, closed under `requires`) and `permissions.test.ts` (map shape, dependency resolution); both fail when a label or a `requires` entry is changed on purpose; prettier/lint/typecheck clean, `npm test` 11 files 54/54, `npm run build` green (3 migrations copied)
 
 - 2026-09-22 · 1.1 done: `db/init/00-roles.sql` (`app_owner` BYPASSRLS, `app_user` NOBYPASSRLS with 15s/30s timeouts, passwords from env, re-runnable) mounted in both compose files and run by CI; `0002-access.sql` (businesses columns, offices, roles, permissions, role/user permissions, users `citext`, user_offices, sessions, audit_logs, notifications, grants); API now logs in as `app_user`
 - 1.1 check: fresh `postgres:17` + init → `npm run migrate` as `app_owner` applied 0001+0002, second run no-op; `\dp` matches the plan (sessions/migrations none, audit_logs `ar`, permissions `r`); new `access.schema.spec.ts` (roles, ownership, exact grants, re-run, constraints)
