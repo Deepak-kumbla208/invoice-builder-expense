@@ -3,7 +3,7 @@
 | Phase                                             | Plan                    | Status                                 |
 | ------------------------------------------------- | ----------------------- | -------------------------------------- |
 | 0 Foundation                                      | `phase-0-foundation.md` | **Done** (branch `phase-0-foundation`) |
-| 1 Access (auth, RBAC, RLS)                        | `phase-1-access.md`     | Not started                            |
+| 1 Access (auth, RBAC, RLS)                        | `phase-1-access.md`     | In progress (branch `phase-1-access`)  |
 | 2 Invoices (office, GST, numbering, credit notes) | `phase-2-invoices.md`   | Not started                            |
 | 3 Expenses & reimbursements                       | `phase-3-expenses.md`   | Not started                            |
 | 4 UX (dashboard, switcher, ageing, responsive)    | `phase-4-ux.md`         | Not started                            |
@@ -25,9 +25,9 @@
 
 ## Current
 
-- **Active phase:** 1 (not started)
-- **Next task:** 1.1, per `docs/plans/phase-1-access.md`
-- **Blockers:** none (note: host port 5432 is held by an unrelated `i-ticket-postgres-1` container, so the dev database is unreachable until that port is freed or remapped)
+- **Active phase:** 1 (branch `phase-1-access`)
+- **Next task:** 1.2, per `docs/plans/phase-1-access.md`
+- **Blockers:** none (note: host port 5432 is held by an unrelated `i-ticket-postgres-1` container, so the dev database is unreachable until that port is freed or remapped; a data volume created before 1.1 has no `app_owner`/`app_user` until it is recreated, see `phase-1-notes.md`)
 
 ### Phase 0 gate (2026-09-16)
 
@@ -47,6 +47,11 @@ New feature tests and RLS/IDOR/permission tests do not apply to Phase 0.
 ## Session log
 
 <!-- newest first, ≤10 lines per session: date · tasks done · checks run/results · next · blockers -->
+
+- 2026-09-22 · 1.1 done: `db/init/00-roles.sql` (`app_owner` BYPASSRLS, `app_user` NOBYPASSRLS with 15s/30s timeouts, passwords from env, re-runnable) mounted in both compose files and run by CI; `0002-access.sql` (businesses columns, offices, roles, permissions, role/user permissions, users `citext`, user_offices, sessions, audit_logs, notifications, grants); API now logs in as `app_user`
+- 1.1 check: fresh `postgres:17` + init → `npm run migrate` as `app_owner` applied 0001+0002, second run no-op; `\dp` matches the plan (sessions/migrations none, audit_logs `ar`, permissions `r`); new `access.schema.spec.ts` (roles, ownership, exact grants, re-run, constraints)
+- 1.1 check: prettier/lint/typecheck clean, `npm test` 9 files 46/46, `npm run build` green (2 migrations copied), `npm run test:e2e` 2/2 **with the API as `app_user`**
+- 1.1 note: JSON import's `setval` fails as `app_user` until 1.8 deletes it; test DB helper runs migrations as `app_owner`. Details in `phase-1-notes.md`
 
 - 2026-09-16 · 0.7 done, **Phase 0 complete**: `e2e/invoice-regression.spec.ts` drives the whole flow through the UI — company, client, currency, bank and item, then an invoice with 2 lines, a fixed discount and a partial payment, an edit re-read from the list, a PDF preview and download, and a duplicate; it asserts the numbers end up `['1','2']`
 - 0.7 check: prettier/lint/typecheck clean, `npm test` 8 files 38/38, `npm run build` green, `npm run test:e2e` 2/2 (stable over 3 consecutive runs), Docker stack green, 375 px and 1280 px render with no overflow and no console errors
