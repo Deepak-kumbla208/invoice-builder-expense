@@ -26,7 +26,7 @@
 ## Current
 
 - **Active phase:** 1 (branch `phase-1-access`)
-- **Next task:** 1.4, per `docs/plans/phase-1-access.md`
+- **Next task:** 1.5, per `docs/plans/phase-1-access.md`
 - **Blockers:** none (note: host port 5432 is held by an unrelated `i-ticket-postgres-1` container, so the dev database is unreachable until that port is freed or remapped; a data volume created before 1.1 has no `app_owner`/`app_user` until it is recreated, see `phase-1-notes.md`)
 
 ### Phase 0 gate (2026-09-16)
@@ -47,6 +47,10 @@ New feature tests and RLS/IDOR/permission tests do not apply to Phase 0.
 ## Session log
 
 <!-- newest first, ≤10 lines per session: date · tasks done · checks run/results · next · blockers -->
+
+- 2026-09-22 · 1.4 done: `withRequestTx`/`withSystemTx`, `createApp(deps)` + session/CSRF/permission/error middleware, `/api/auth/{login,logout,me,change-password}` (argon2id, origin check, 50/IP + 5 failures/IP+email per 15 min, token rotation, must-change gate), all 62 existing routes run in `requestTx` behind exactly one permission guard, hourly session cleanup; deps `argon2`, `zod`
+- 1.4 check: new `api/auth.api.spec.ts` (15 cases: public/401, login origin/validation/failures/cookie/rotation, CSRF, logout, route permissions, RLS through the API, forced change, lockout), `api/routes.permissions.spec.ts` (walks the router), `tx.spec.ts` (+request/system tx); prettier/lint/typecheck clean, `npm test` 15 files 102/102, `npm run build` green; browser smoke test of the real dev server confirmed the `__Host-` cookie over http://localhost
+- 1.4 note: app now requires login — no first user until 1.5, no login page until 1.7, invoice e2e resumes at 1.7/1.9. Details in `phase-1-notes.md`
 
 - 2026-09-22 · 1.3 done: `0004-rls-access.sql` — 8 definer helpers (plan's 4 + `app_office_visible`, `app_business_visible`, `app_shares_office`, `app_can_manage_user`), ENABLE+FORCE RLS with one `TO app_user` policy per granted command on the 7 access tables, and the 7 `auth_*` functions (12 h sliding idle / 7 d absolute sessions)
 - 1.3 check: new `rls/access.rls.spec.ts` (structure, helpers, empty/office/all-offices reads, cross-office writes, Office Admin user-creation flow) and `auth.functions.spec.ts` (lookup, ctx contents, expiry, sliding, revocation, cleanup, event log); prettier/lint/typecheck clean, `npm test` 13 files 82/82, `npm run build` green (4 migrations)

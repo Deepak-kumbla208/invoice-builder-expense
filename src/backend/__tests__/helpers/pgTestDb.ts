@@ -39,6 +39,7 @@ const withRole = (connectionString: string, role: string) => {
 
 export type PgTestDb = {
   withTx: <T>(fn: (db: Db) => Promise<T>) => Promise<T>;
+  rolePool: (role: 'app_user' | 'app_owner', max?: number) => Pool;
   migrate: () => Promise<string[]>;
   databaseName: string;
   drop: () => Promise<void>;
@@ -62,13 +63,20 @@ export const createPgTestDb = async (): Promise<PgTestDb> => {
 
   const pool = new Pool({ connectionString });
   const withTx = createWithTx(pool);
+  const rolePools: Pool[] = [];
+  const rolePool = (role: 'app_user' | 'app_owner', max = 10) => {
+    const created = new Pool({ connectionString: withRole(connectionString, role), max });
+    rolePools.push(created);
+    return created;
+  };
 
   const drop = async () => {
+    await Promise.all(rolePools.map(created => created.end()));
     await pool.end();
     await withClient(TEST_DATABASE_URL, client =>
       client.query(`DROP DATABASE IF EXISTS "${databaseName}" WITH (FORCE)`)
     );
   };
 
-  return { withTx, migrate, databaseName, drop };
+  return { withTx, rolePool, migrate, databaseName, drop };
 };

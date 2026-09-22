@@ -63,5 +63,14 @@ export default [
         }
       ]
     }
+  },
+  {
+    files: ['src/backend/webserver/controllers/**/*.ts', 'src/backend/shared/services/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { patterns: [{ group: ['**/db/systemTx'], message: 'Only internal jobs may use withSystemTx.' }] }
+      ]
+    }
   }
 ];

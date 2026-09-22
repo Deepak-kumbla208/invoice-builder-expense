@@ -42,3 +42,38 @@
   - `auth_log_event` records only `auth.*` actions (otherwise 22023) and stores `meta` in `after`.
 - **Known breakage until 1.4:** the API connects as `app_user` but doesn't set a context yet, so companies, offices and users are hidden and companies can't be created. The running app and the e2e suite (when run as `app_user`) therefore fail until 1.4 adds `withRequestTx` and login. Unit and integration tests run as the superuser and still pass.
 - **Test setup:** vitest now finds tests anywhere under `__tests__/**`. `helpers/asAppUser.ts` switches to `app_user` and sets a context. `rls/access.rls.spec.ts` is the start of 1.9's RLS suite, and `auth.functions.spec.ts` covers the auth functions. The 1.1 grants test no longer inserts an audit row without a context.
+
+## Task 1.4 decisions
+
+- **Structure.**
+  - `webserver/app.ts` exports `createApp(deps, { appOrigin })`, so tests run the real app against a test pool.
+  - `main.ts` wires the global pool, starts the hourly session-cleanup job and listens.
+  - `webserver/deps.ts` provides `withTx`, a transaction with no context that is used only for `auth_*` definer calls, and `requestTx(req, fn)`, which is `withRequestTx(req.ctx, fn)`. Every controller receives these instead of importing `withTx`.
+- **Middleware order:** helmet → request id → body limits → health/version → session (loads `req.ctx` from `__Host-sid` in its own short transaction and clears a stale cookie) → auth routes → `requireAuth` → must-change-password gate → CSRF → controllers → a JSON 404 for any other `/api` path → error handler.
+- **Guards.** There are three:
+  - `requirePermission(...keys)`: needs all of the keys.
+  - `requireAnyPermission(...keys)`: needs at least one.
+  - `requireAuthenticated()`: any signed-in user. It is used only for `GET /api/settings`, which every screen needs.
+
+  Each guard carries its rule as metadata. `routes.permissions.spec.ts` walks the Express router and fails if any route other than auth, health and version lacks exactly one guard. That covers the phase exit criterion.
+
+- **Permissions on the existing routes:**
+  - Setup data (banks, items, units, currencies, layouts, style profiles, presets, categories): reading needs any of `invoice.view`, `invoice.view_all` or `admin.invoice_setup` (see the 1.2 note); writing needs `admin.invoice_setup`.
+  - Companies: reading needs any of `invoice.view`, `invoice.view_all` or `admin.companies`; writing needs `admin.companies`.
+  - Clients: reading needs `customer.view`; writing needs `customer.manage`.
+  - Invoices: listing and headers need `invoice.view` or `invoice.view_all`; next number needs `create` or `edit`; create and duplicate need `invoice.create`; update needs `edit`; delete needs `delete`; XML needs `download`.
+  - Settings: `PUT` needs `admin.settings`.
+  - JSON export and import need `admin.settings` until 1.8 deletes them.
+- **Errors.** `AppError(kind, key, fields)` maps to 400/401/403/404/409/500. A zod failure returns `errors` keyed by field. Postgres error 42501 (an RLS `WITH CHECK` failure or a missing grant) returns the standard 404 body, so an ID hidden by RLS can't be told apart from one that doesn't exist. Existing services still return `{ success: false, key }` with 200, as before.
+- **Login.**
+  - A strict `Origin` check applies: `APP_ORIGIN` if set (compose sets it to `https://${APP_DOMAIN}`), otherwise the request's own origin. That own-origin fallback is what keeps dev behind the Vite proxy working.
+  - Rate limits are in memory, per 15 minutes: 50 per IP, and 5 _failed_ attempts per IP+email. An in-memory limiter is fine with a single API process.
+  - An unknown email still runs one argon2 verify against a throwaway hash, so response timing doesn't reveal whether the email exists.
+  - The response is always the generic `auth.invalidCredentials`. The actual reason (`unknown_email`/`wrong_password`/`inactive`) goes only into the audit event's `after`.
+  - Every login issues a new token and revokes the one in the incoming cookie. The response body is the same as `/me`.
+- **Change password:** at least 12 characters, and it must differ from the current one (`auth.passwordUnchanged`). The current password is checked outside any transaction, so argon2 never holds a transaction open. The user's other sessions are revoked and the current one is kept. **Logout** requires a session and the CSRF token.
+- **Cookie in dev (verified):** Chromium in the desktop app accepts and sends the `Secure` `__Host-sid` cookie over `http://localhost` through the Vite proxy. The cookie is HttpOnly, so JavaScript can't read it. A full login → `/me` → guarded GET → CSRF POST → logout run against the real `main.ts` as `app_user` worked. This matters for 1.7.
+- **`withSystemTx`** hands the job a `call(name, ...args)` function instead of a raw `Db`. The name must match `auth_cleanup_sessions` or `sys_*`, and the arguments are parameterised. ESLint forbids importing `systemTx` in controllers and services. The cleanup timer is `unref`'d.
+- **New dependencies:** `argon2` (argon2id; ships prebuilt binaries, including for Alpine/musl) and `zod` 4.
+- **Current state:** the app now requires login. Until 1.5 (admin CLI) there is no supported way to create the first user, and until 1.7 there is no login page, so the invoice e2e can't run again until 1.7/1.9.
+- **Test setup:** `helpers/testServer.ts` starts the real app on a random port with an `app_user` pool and provides a small `fetch` client that handles cookies and CSRF. `pgTestDb.rolePool(role, max)` opens a pool as `app_user` or `app_owner`.

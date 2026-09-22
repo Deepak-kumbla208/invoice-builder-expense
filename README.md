@@ -109,6 +109,7 @@ successfully. To apply migrations without restarting the API, run `docker compos
 | ------------------------ | --------- | -------------------------------------------------------------------------------- |
 | `DATABASE_URL`           | API       | PostgreSQL connection string, as `app_user`                                      |
 | `MIGRATION_DATABASE_URL` | `migrate` | Connection string for migrations, as `app_owner`; falls back to `DATABASE_URL`   |
+| `APP_ORIGIN`             | API       | Origin the login request must come from; defaults to the request's own origin    |
 | `HOST`                   | API       | Bind address (default `127.0.0.1`; the image sets `0.0.0.0`)                     |
 | `PORT`                   | API       | API port (default `3000`)                                                        |
 | `APP_DOMAIN`             | Caddy     | Hostname Caddy serves and requests a certificate for                             |
