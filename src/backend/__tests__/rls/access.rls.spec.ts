@@ -157,7 +157,7 @@ describe('RLS on access tables (0004)', () => {
            WHERE pronamespace = 'public'::regnamespace AND (proname LIKE 'app\\_%' OR proname LIKE 'auth\\_%')`
         )
       );
-      expect(rows.length).toBe(15);
+      expect(rows.length).toBe(16);
       for (const row of rows) {
         expect(row, row.proname).toMatchObject({
           owner: 'app_owner',

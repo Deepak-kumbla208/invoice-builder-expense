@@ -89,3 +89,41 @@
   - `admin-cli create-super-admin` with piped input created the user and its audit row. A second run with the same email exited 1.
   - The production `app` container logged the new admin in (argon2 on Alpine) and returned 32 permissions.
 - **Not automated:** hidden echo on a real terminal. Tests cover piped input only.
+
+## Task 1.6 decisions
+
+- **Effective permissions (corrects the 1.2 note).** Each `*.view_all` key now declares `includes` for the matching own-records key (`invoice.view`, `expense.view_own`, `reimbursement.view_own`). The session context expands them with `expandPermissions`. Without this, the seeded Office Admin (which has `reimbursement.view_all` but not `view_own`) could not assign the User role under the anti-escalation rule. Services can now check the own-records key directly instead of accepting either key.
+- **Companies** stay at `/api/businesses`, because the existing page is reused in 1.7.
+  - `POST` and `PUT` are validated with zod. Unknown keys are stripped, `''` becomes `null`, and the PAN is upper-cased and checked. The four new columns keep their snake_case keys (`legal_name`, `pan`, `default_layout_id`, `default_style_profile_id`), matching what `GET` returns.
+  - Only all-offices users can create companies.
+  - `company.create` and `company.update` are audited with `business_id`.
+  - **`DELETE` and `/batch` are removed** (archive through `isArchived`). The old page's delete button and the business XLSX import now get 404 until 1.7/1.8 remove them.
+- **Offices:** `/api/offices` (reads need `admin.offices` or `admin.users`; writes need `admin.offices`).
+  - The code is upper-cased.
+  - `stateCode` must be in `shared/constants/gstStates.ts`: 01–24, 26, 27, 29–38, 97 and 96 "Other country". 25 and 28 are no longer issued. The file is import-free, enforced by lint, so the renderer can import it.
+  - The GSTIN must match the format and start with the state code. The checksum is not checked.
+  - The LUT reference and date must be given together and need a GSTIN. `lutValidUntil` is returned as a `YYYY-MM-DD` string, so there is no timezone shift.
+  - Only all-offices users can create offices, and `businessId` can't be changed afterwards.
+  - `office.create` and `office.update` are audited with the office's scope.
+- **Roles:** `/api/roles` and `/api/permissions` (grouped by module, with labels and `requires`).
+  - Permission sets are stored closed under `requires`.
+  - The system role's permissions are locked (`role.systemLocked`) and it can't be deleted. A role still in use gives `role.inUse`.
+  - `affectedUsers` comes from the new definer `app_role_user_count`, which counts active users in every office.
+  - An editor can't add permissions they don't hold; removing is allowed.
+  - Role edits never revoke sessions (D23).
+- **Users:** `/api/users`, `/api/users/:id` and `POST /api/users/:id/reset-password`.
+  - **New users also get a one-time temporary password** of 16 unambiguous characters, the same as a reset, with `must_change_password` set and `password_expires_at = now() + 24 h`.
+  - Migration `0005` adds the column and returns it from `auth_find_user_by_email`.
+  - A login after the expiry gets 401 `auth.temporaryPasswordExpired`, but only after the password has been checked, so it reveals nothing to someone who doesn't know the password. Changing the password clears the expiry.
+- **Anti-escalation and scope for users:**
+  - Only all-offices callers can set `allOffices`.
+  - Assigned offices must be within the caller's offices.
+  - The role's permissions and any _added_ extra grants must be within the caller's effective permissions.
+  - The target user must pass `app_can_manage_user`.
+  - Users can't change their own role, offices, active flag or grants through the admin API; name and email are fine.
+  - Extra grants are stored as closure(role ∪ requested) − role.
+- **Sessions are revoked** when a user's role, offices (including `allOffices`) or active flag changes, and on a password reset. They are not revoked for name, email or grant changes.
+- **The last active Super Admin** (system role, active, all offices) can't be deactivated or demoted. The check locks the other Super Admins' rows `FOR UPDATE`.
+- **Audit rows for users** (`user.create`, `user.update`, `user.password_reset`) are scoped to the user's lowest office id, or are global for all-offices users. That way an Office Admin with `audit.view` sees changes in their office. No hashes are ever written to the log.
+- **Audit log:** `GET /api/audit-logs` (`audit.view`) is paged, newest first. It filters by `action`, `entityType`, `entityId` or `actorUserId`, is scoped by RLS, and includes the actor's name and email. Ids are returned as numbers.
+- `AppError` moved to `shared/errors.ts`, so services can throw it; the middleware maps it to a response.

@@ -95,7 +95,15 @@ describe('auth definer functions (0004)', () => {
 
   it('finds a user by email, case-insensitively, returning only login fields', async () => {
     const rows = await anon(db => db.all('SELECT * FROM auth_find_user_by_email(?)', ['alice@EXAMPLE.com']));
-    expect(rows).toEqual([{ id: alice, password_hash: 'argon2-hash', is_active: true, must_change_password: false }]);
+    expect(rows).toEqual([
+      {
+        id: alice,
+        password_hash: 'argon2-hash',
+        is_active: true,
+        must_change_password: false,
+        password_expires_at: null
+      }
+    ]);
     await expect(anon(db => db.all('SELECT * FROM auth_find_user_by_email(?)', ['nobody@x.com']))).resolves.toEqual([]);
   });
 

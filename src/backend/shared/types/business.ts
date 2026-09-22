@@ -21,6 +21,10 @@ export interface Business {
   fileType?: string;
   fileName?: string;
   description?: string;
+  legal_name?: string | null;
+  pan?: string | null;
+  default_layout_id?: number | null;
+  default_style_profile_id?: number | null;
   createdAt: string;
   updatedAt: string;
   invoiceCount: number;

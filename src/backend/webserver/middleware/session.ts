@@ -1,5 +1,6 @@
 import type { CookieOptions, NextFunction, Request, Response } from 'express';
 import type { RequestCtx } from '../../shared/auth/context';
+import { expandPermissions } from '../../shared/auth/permissions';
 import { hashToken } from '../../shared/auth/tokens';
 import type { WithTx } from '../../shared/db/tx';
 import { AppError } from './errors';
@@ -58,7 +59,7 @@ export const loadSession = async (
     fullName: row.full_name,
     roleId: row.role_id,
     roleName: row.role_name,
-    permissions: new Set(row.permissions),
+    permissions: expandPermissions(row.permissions),
     officeIds: row.office_ids,
     businessIds: row.business_ids,
     allOffices: row.all_offices,

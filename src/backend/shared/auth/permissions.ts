@@ -4,6 +4,7 @@ export type PermissionDefinition = {
   label: string;
   sortOrder: number;
   requires: readonly string[];
+  includes?: readonly string[];
 };
 
 export const PERMISSIONS = [
@@ -15,7 +16,14 @@ export const PERMISSIONS = [
     requires: ['invoice.view', 'customer.view']
   },
   { key: 'invoice.view', group: 'Invoices', label: 'View own invoices', sortOrder: 20, requires: [] },
-  { key: 'invoice.view_all', group: 'Invoices', label: 'View all invoices', sortOrder: 30, requires: [] },
+  {
+    key: 'invoice.view_all',
+    group: 'Invoices',
+    label: 'View all invoices',
+    sortOrder: 30,
+    requires: [],
+    includes: ['invoice.view']
+  },
   {
     key: 'invoice.edit',
     group: 'Invoices',
@@ -59,7 +67,14 @@ export const PERMISSIONS = [
     requires: ['expense.view_own']
   },
   { key: 'expense.view_own', group: 'Expenses', label: 'View own expenses', sortOrder: 140, requires: [] },
-  { key: 'expense.view_all', group: 'Expenses', label: 'View all expenses', sortOrder: 150, requires: [] },
+  {
+    key: 'expense.view_all',
+    group: 'Expenses',
+    label: 'View all expenses',
+    sortOrder: 150,
+    requires: [],
+    includes: ['expense.view_own']
+  },
   { key: 'expense.edit', group: 'Expenses', label: 'Edit expenses', sortOrder: 160, requires: ['expense.view_own'] },
   {
     key: 'expense.delete',
@@ -95,7 +110,8 @@ export const PERMISSIONS = [
     group: 'Reimbursements',
     label: 'View all reimbursements',
     sortOrder: 210,
-    requires: []
+    requires: [],
+    includes: ['reimbursement.view_own']
   },
   {
     key: 'reimbursement.pay',
@@ -135,6 +151,14 @@ export type PermissionKey = (typeof PERMISSIONS)[number]['key'];
 const BY_KEY = new Map<string, PermissionDefinition>(PERMISSIONS.map(permission => [permission.key, permission]));
 
 export const isPermissionKey = (key: string): key is PermissionKey => BY_KEY.has(key);
+
+export const expandPermissions = (keys: Iterable<string>): Set<string> => {
+  const expanded = new Set(keys);
+  for (const key of [...expanded]) {
+    for (const included of BY_KEY.get(key)?.includes ?? []) expanded.add(included);
+  }
+  return expanded;
+};
 
 export const resolveDependencies = (keys: Iterable<string>): PermissionKey[] => {
   const resolved = new Set<string>();

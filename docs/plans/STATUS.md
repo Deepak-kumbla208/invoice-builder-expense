@@ -26,7 +26,7 @@
 ## Current
 
 - **Active phase:** 1 (branch `phase-1-access`)
-- **Next task:** 1.6, per `docs/plans/phase-1-access.md`
+- **Next task:** 1.7, per `docs/plans/phase-1-access.md`
 - **Blockers:** none (note: host port 5432 is held by an unrelated `i-ticket-postgres-1` container, so the dev database is unreachable until that port is freed or remapped; a data volume created before 1.1 has no `app_owner`/`app_user` until it is recreated, see `phase-1-notes.md`)
 
 ### Phase 0 gate (2026-09-16)
@@ -47,6 +47,10 @@ New feature tests and RLS/IDOR/permission tests do not apply to Phase 0.
 ## Session log
 
 <!-- newest first, ≤10 lines per session: date · tasks done · checks run/results · next · blockers -->
+
+- 2026-09-22 · 1.6 done: admin APIs, all zod-validated and audited in the request transaction — companies (`/api/businesses`, archive-only, `DELETE`/`batch` removed), `/api/offices` (GSTIN/state/LUT rules, `gstStates.ts`), `/api/roles` + `/api/permissions` (closed sets, system role locked, `affectedUsers`), `/api/users` (temp password 24 h, anti-escalation, revocation rules, last Super Admin), `/api/audit-logs` (paged); `0005-access-admin.sql`
+- 1.6 change: `*.view_all` now `includes` the own-records key in effective permissions (the seeded Office Admin otherwise couldn't assign the User role)
+- 1.6 check: new `api/admin.api.spec.ts` (18 cases); prettier/lint/typecheck clean, `npm test` 17 files 127/127, `npm run build` green (5 migrations). Details in `phase-1-notes.md`
 
 - 2026-09-22 · 1.5 done: `src/backend/admin-cli` (`npm run admin -- create-super-admin`; prompts email, name, hidden password twice; `MIGRATION_DATABASE_URL` only; `is_system` role, `all_offices`, audit row), compiled into `dist-be`, compose service `admin-cli` (profile `tools`), README first-run steps
 - 1.5 check: new `adminCli.spec.ts` (function, API login as the new admin, validation/duplicates, real entry point with piped stdin); prettier/lint/typecheck clean, `npm test` 16 files 108/108, `npm run build` green; Docker end to end in a throwaway project: init roles → migrate → admin-cli → login via the `app` container (argon2 on Alpine) all green

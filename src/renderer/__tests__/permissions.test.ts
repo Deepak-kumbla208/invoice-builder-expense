@@ -1,4 +1,4 @@
-import { PERMISSIONS, isPermissionKey, resolveDependencies } from '@shared/auth/permissions';
+import { PERMISSIONS, expandPermissions, isPermissionKey, resolveDependencies } from '@shared/auth/permissions';
 
 describe('permission map', () => {
   it('has unique, well-formed keys in ascending sort order', () => {
@@ -40,5 +40,22 @@ describe('permission map', () => {
 
   it('rejects unknown keys', () => {
     expect(() => resolveDependencies(['invoice.view', 'invoice.hack'])).toThrow('Unknown permission: invoice.hack');
+  });
+
+  it('lets each "view all" permission include the matching own-records permission', () => {
+    const includes = PERMISSIONS.flatMap(permission =>
+      ((permission as { includes?: readonly string[] }).includes ?? []).map(included => [permission.key, included])
+    );
+    expect(includes).toEqual([
+      ['invoice.view_all', 'invoice.view'],
+      ['expense.view_all', 'expense.view_own'],
+      ['reimbursement.view_all', 'reimbursement.view_own']
+    ]);
+    expect([...expandPermissions(['reimbursement.view_all', 'report.view'])].sort()).toEqual([
+      'reimbursement.view_all',
+      'reimbursement.view_own',
+      'report.view'
+    ]);
+    expect([...expandPermissions(['reimbursement.view_own'])]).toEqual(['reimbursement.view_own']);
   });
 });

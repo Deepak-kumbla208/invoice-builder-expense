@@ -1,7 +1,9 @@
 import type { NextFunction, Request, Response } from 'express';
 import type { z } from 'zod';
+import { AppError, DEFAULT_ERROR_KEY as DEFAULT_KEY, type AppErrorKind } from '../../shared/errors';
+import { idParamSchema } from '../../shared/validation/admin';
 
-export type AppErrorKind = 'validation' | 'unauthenticated' | 'forbidden' | 'notFound' | 'conflict' | 'internal';
+export { AppError };
 
 const STATUS: Record<AppErrorKind, number> = {
   validation: 400,
@@ -11,28 +13,6 @@ const STATUS: Record<AppErrorKind, number> = {
   conflict: 409,
   internal: 500
 };
-
-const DEFAULT_KEY: Record<AppErrorKind, string> = {
-  validation: 'error.validation',
-  unauthenticated: 'auth.unauthenticated',
-  forbidden: 'auth.forbidden',
-  notFound: 'error.notFound',
-  conflict: 'error.conflict',
-  internal: 'error.unknownError'
-};
-
-export class AppError extends Error {
-  readonly kind: AppErrorKind;
-  readonly key: string;
-  readonly fields?: Record<string, string[]>;
-
-  constructor(kind: AppErrorKind, key = DEFAULT_KEY[kind], fields?: Record<string, string[]>) {
-    super(key);
-    this.kind = kind;
-    this.key = key;
-    this.fields = fields;
-  }
-}
 
 export const parseBody = <S extends z.ZodType>(schema: S, body: unknown): z.infer<S> => {
   const result = schema.safeParse(body ?? {});
@@ -72,4 +52,10 @@ export const errorHandler = (error: HttpError, req: Request, res: Response, _nex
     message,
     ...(appError?.fields ? { errors: appError.fields } : {})
   });
+};
+
+export const parseId = (raw: unknown): number => {
+  const result = idParamSchema.safeParse(raw);
+  if (!result.success) throw new AppError('notFound');
+  return result.data;
 };

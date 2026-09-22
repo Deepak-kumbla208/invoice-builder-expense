@@ -54,7 +54,7 @@ export default [
     }
   },
   {
-    files: ['src/backend/shared/auth/permissions.ts'],
+    files: ['src/backend/shared/auth/permissions.ts', 'src/backend/shared/constants/gstStates.ts'],
     rules: {
       'no-restricted-imports': [
         'error',

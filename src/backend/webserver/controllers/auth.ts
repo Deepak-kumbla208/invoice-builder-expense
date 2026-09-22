@@ -35,7 +35,13 @@ const changePasswordSchema = z.object({
   newPassword: z.string().min(MIN_PASSWORD_LENGTH).max(MAX_PASSWORD_LENGTH)
 });
 
-type LoginUser = { id: number; password_hash: string; is_active: boolean };
+type LoginUser = {
+  id: number;
+  password_hash: string;
+  is_active: boolean;
+  must_change_password: boolean;
+  password_expires_at: Date | null;
+};
 
 const tooManyAttempts = (_req: Request, res: Response) => {
   res.status(429).json({ success: false, key: 'auth.tooManyAttempts', message: 'auth.tooManyAttempts' });
@@ -94,9 +100,7 @@ export const initAuthController = (app: Express, { withTx, requestTx }: ServerDe
 
   app.post('/api/auth/login', requireSameOrigin(appOrigin), ...loginLimiters(), async (req: Request, res: Response) => {
     const { email, password } = parseBody(loginSchema, req.body);
-    const user = await withTx(db =>
-      db.get<LoginUser>('SELECT id, password_hash, is_active FROM auth_find_user_by_email(?)', [email])
-    );
+    const user = await withTx(db => db.get<LoginUser>('SELECT * FROM auth_find_user_by_email(?)', [email]));
 
     let passwordOk = false;
     if (user) passwordOk = await verifyPassword(user.password_hash, password);
@@ -106,6 +110,10 @@ export const initAuthController = (app: Express, { withTx, requestTx }: ServerDe
       const reason = !user ? 'unknown_email' : !passwordOk ? 'wrong_password' : 'inactive';
       await logEvent(user?.id ?? null, 'auth.login_failed', req, { email, reason });
       throw new AppError('unauthenticated', 'auth.invalidCredentials');
+    }
+    if (user.must_change_password && user.password_expires_at && user.password_expires_at <= new Date()) {
+      await logEvent(user.id, 'auth.login_failed', req, { email, reason: 'temporary_password_expired' });
+      throw new AppError('unauthenticated', 'auth.temporaryPasswordExpired');
     }
 
     const previousToken = readCookie(req, SESSION_COOKIE);
@@ -161,7 +169,7 @@ export const initAuthController = (app: Express, { withTx, requestTx }: ServerDe
     const passwordHash = await hashPassword(newPassword);
     await requestTx(req, async db => {
       await db.run(
-        'UPDATE users SET password_hash = ?, must_change_password = false, updated_at = now() WHERE id = ?',
+        'UPDATE users SET password_hash = ?, must_change_password = false, password_expires_at = NULL, updated_at = now() WHERE id = ?',
         [passwordHash, ctx.userId]
       );
       await db.query('SELECT auth_revoke_sessions(?, ?)', [ctx.userId, ctx.sessionTokenHash]);

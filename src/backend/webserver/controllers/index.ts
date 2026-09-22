@@ -1,5 +1,6 @@
 import { type Express } from 'express';
 import type { ServerDeps } from '../deps';
+import { initAuditLogsController } from './auditLogs';
 import { initBanksController } from './banks';
 import { initBusinessesController } from './businesses';
 import { initCategoriesController } from './categories';
@@ -9,10 +10,13 @@ import { initImportExportController } from './importExport';
 import { initInvoicesController } from './invoices';
 import { initItemsController } from './items';
 import { initLayoutsController } from './layouts';
+import { initOfficesController } from './offices';
 import { initPresetsController } from './presets';
+import { initRolesController } from './roles';
 import { initSettingsController } from './settings';
 import { initStyleProfilesController } from './styleProfiles';
 import { initUnitsController } from './units';
+import { initUsersController } from './users';
 
 export const initControllers = (app: Express, deps: ServerDeps) => {
   initImportExportController(app, deps);
@@ -28,4 +32,8 @@ export const initControllers = (app: Express, deps: ServerDeps) => {
   initCurrenciesController(app, deps);
   initBanksController(app, deps);
   initPresetsController(app, deps);
+  initOfficesController(app, deps);
+  initRolesController(app, deps);
+  initUsersController(app, deps);
+  initAuditLogsController(app, deps);
 };
