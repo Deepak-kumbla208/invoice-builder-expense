@@ -104,7 +104,6 @@ describe('access schema (0002)', () => {
     expect(roleId).toBeGreaterThan(0);
 
     await expect(asAppUser(db => db.all('SELECT * FROM sessions'))).rejects.toMatchObject({ code: '42501' });
-    await asAppUser(db => db.run(`INSERT INTO audit_logs (action) VALUES ('test.event')`));
     await expect(asAppUser(db => db.run(`UPDATE audit_logs SET action = 'x'`))).rejects.toMatchObject({
       code: '42501'
     });

@@ -26,7 +26,7 @@
 ## Current
 
 - **Active phase:** 1 (branch `phase-1-access`)
-- **Next task:** 1.3, per `docs/plans/phase-1-access.md` (its migration is now `0004-rls-access.sql`)
+- **Next task:** 1.4, per `docs/plans/phase-1-access.md`
 - **Blockers:** none (note: host port 5432 is held by an unrelated `i-ticket-postgres-1` container, so the dev database is unreachable until that port is freed or remapped; a data volume created before 1.1 has no `app_owner`/`app_user` until it is recreated, see `phase-1-notes.md`)
 
 ### Phase 0 gate (2026-09-16)
@@ -47,6 +47,10 @@ New feature tests and RLS/IDOR/permission tests do not apply to Phase 0.
 ## Session log
 
 <!-- newest first, ≤10 lines per session: date · tasks done · checks run/results · next · blockers -->
+
+- 2026-09-22 · 1.3 done: `0004-rls-access.sql` — 8 definer helpers (plan's 4 + `app_office_visible`, `app_business_visible`, `app_shares_office`, `app_can_manage_user`), ENABLE+FORCE RLS with one `TO app_user` policy per granted command on the 7 access tables, and the 7 `auth_*` functions (12 h sliding idle / 7 d absolute sessions)
+- 1.3 check: new `rls/access.rls.spec.ts` (structure, helpers, empty/office/all-offices reads, cross-office writes, Office Admin user-creation flow) and `auth.functions.spec.ts` (lookup, ctx contents, expiry, sliding, revocation, cleanup, event log); prettier/lint/typecheck clean, `npm test` 13 files 82/82, `npm run build` green (4 migrations)
+- 1.3 **expected breakage until 1.4:** the API as `app_user` sets no ctx yet, so companies/offices/users are hidden and the app/e2e fail until 1.4 wires `withRequestTx` + login. `INSERT … RETURNING` needs SELECT visibility (matters for 1.6). Details in `phase-1-notes.md`
 
 - 2026-09-22 · 1.2 done: `shared/auth/permissions.ts` (32 keys from design §7.1 with group, label, sortOrder, `requires`; `resolveDependencies`, `isPermissionKey`), `0003-permissions.sql` seeds permissions + Super Admin (system, all), Office Admin (§7.1 + `admin.users` for A8 + `credit_note.create`, user ruling), User; renderer reaches the map through the new `@shared` alias; ESLint forbids imports in the map
 - 1.2 check: `permissions.sync.spec.ts` (DB rows = map, exact seeded role sets, closed under `requires`) and `permissions.test.ts` (map shape, dependency resolution); both fail when a label or a `requires` entry is changed on purpose; prettier/lint/typecheck clean, `npm test` 11 files 54/54, `npm run build` green (3 migrations copied)

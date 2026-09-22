@@ -52,7 +52,7 @@ export default defineConfig(({ mode }) => {
         reporter: ['text', 'json', 'html']
       },
       exclude: [...configDefaults.exclude, 'node_modules'],
-      include: ['src/**/__tests__/*.{test,spec}.{js,ts,jsx,tsx}']
+      include: ['src/**/__tests__/**/*.{test,spec}.{js,ts,jsx,tsx}']
     },
     resolve: {
       alias: {
