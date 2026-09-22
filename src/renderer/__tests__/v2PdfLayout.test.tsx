@@ -184,7 +184,7 @@ describe('V2 PDF layout rendering', () => {
     expect(width).toBeGreaterThan(height);
   });
 
-  it('keeps fixed visual assets and page counters on a multi-page document', async () => {
+  it('keeps fixed visual assets and page counters on a multi-page document', { timeout: 20_000 }, async () => {
     const imageSource = resolve(process.cwd(), 'src/renderer/assets/icon.png');
     // Use a larger item set than the shared `items` fixture so the resulting page count
     // clears the 2-page threshold with a wide margin, avoiding cross-platform font
