@@ -46,6 +46,7 @@
     "build:react": "vite build",
     "build:webserver": "tsc -p tsconfig.webserver.json && node scripts/copy-webserver-assets.js",
     "migrate": "npx tsx src/backend/webserver/migrate.ts",
+    "admin": "npx tsx src/backend/admin-cli/index.ts",
     "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.webserver.json --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint --fix .",

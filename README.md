@@ -78,6 +78,7 @@ The script only runs against an empty data directory: for a volume created befor
 | ------------------- | -------------------------------------------------- |
 | `npm run dev`       | Vite dev server and the API, together              |
 | `npm run migrate`   | Apply pending SQL migrations                       |
+| `npm run admin`     | Admin CLI (`-- create-super-admin`)                |
 | `npm run lint`      | ESLint over the whole repo                         |
 | `npm run typecheck` | TypeScript, renderer and server                    |
 | `npm test`          | Unit and integration tests (needs `postgres-test`) |
@@ -93,7 +94,12 @@ The script only runs against an empty data directory: for a volume created befor
 ```bash
 cp .env.example .env     # set APP_DOMAIN and the passwords
 docker compose up -d --build
+docker compose run --rm admin-cli create-super-admin   # first run only
 ```
+
+There are no built-in users. `create-super-admin` asks for an email, a name and a password (at
+least 12 characters) and creates a Super Admin who can see every company and office. In
+development, run `npm run admin -- create-super-admin` with `MIGRATION_DATABASE_URL` set.
 
 With `APP_DOMAIN=localhost` Caddy issues a certificate from its own internal CA, so
 `https://localhost` works immediately; the browser warns about the CA unless you trust it. For a

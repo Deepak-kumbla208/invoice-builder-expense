@@ -36,6 +36,25 @@ services:
       - internal
     restart: 'no'
 
+  # First run: docker compose run --rm admin-cli create-super-admin
+  admin-cli:
+    build:
+      context: .
+      target: runner
+    entrypoint: ['node', 'dist-be/backend/server/admin-cli/index.js']
+    environment:
+      MIGRATION_DATABASE_URL: ${MIGRATION_DATABASE_URL:?MIGRATION_DATABASE_URL is required}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - internal
+    stdin_open: true
+    tty: true
+    profiles:
+      - tools
+    restart: 'no'
+
   app:
     build:
       context: .

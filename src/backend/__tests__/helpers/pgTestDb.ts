@@ -40,6 +40,7 @@ const withRole = (connectionString: string, role: string) => {
 export type PgTestDb = {
   withTx: <T>(fn: (db: Db) => Promise<T>) => Promise<T>;
   rolePool: (role: 'app_user' | 'app_owner', max?: number) => Pool;
+  connectionStringFor: (role: 'app_user' | 'app_owner') => string;
   migrate: () => Promise<string[]>;
   databaseName: string;
   drop: () => Promise<void>;
@@ -78,5 +79,7 @@ export const createPgTestDb = async (): Promise<PgTestDb> => {
     );
   };
 
-  return { withTx, rolePool, migrate, databaseName, drop };
+  const connectionStringFor = (role: 'app_user' | 'app_owner') => withRole(connectionString, role);
+
+  return { withTx, rolePool, connectionStringFor, migrate, databaseName, drop };
 };

@@ -77,3 +77,15 @@
 - **New dependencies:** `argon2` (argon2id; ships prebuilt binaries, including for Alpine/musl) and `zod` 4.
 - **Current state:** the app now requires login. Until 1.5 (admin CLI) there is no supported way to create the first user, and until 1.7 there is no login page, so the invoice e2e can't run again until 1.7/1.9.
 - **Test setup:** `helpers/testServer.ts` starts the real app on a random port with an `app_user` pool and provides a small `fetch` client that handles cookies and CSRF. `pgTestDb.rolePool(role, max)` opens a pool as `app_user` or `app_owner`.
+
+## Task 1.5 decisions
+
+- **Prompts:** the CLI asks for email, full name (`users.full_name` is NOT NULL), password and the password again. Email and name are validated before the password is requested. The password is read hidden on a terminal: readline writes through a mutable output stream, so no private readline APIs are involved. When stdin is piped, lines are read in order, which lets tests and scripts drive it. Ctrl+C exits with code 130.
+- **Behaviour:** it connects only with `MIGRATION_DATABASE_URL`, with no fallback to `DATABASE_URL` (`app_user` would fail RLS). It finds the role by `is_system`, not by name. Argon2 hashing happens outside the transaction. It refuses an existing email (case-insensitive, including a race on 23505). It writes `audit_logs` (`user.create`, no actor, `request_id = 'admin-cli'`, no hash) in the same transaction. The new user has `must_change_password = false`, since they chose the password.
+- **Build and Docker:** `tsconfig.webserver.json` now also compiles `src/backend/admin-cli`, so the runner image contains `dist-be/backend/server/admin-cli/index.js`. The compose service `admin-cli` (profile `tools`, `stdin_open` + `tty`) uses that file as its entrypoint.
+- **Verified end to end in Docker** with a throwaway compose project, since torn down:
+  - The database container ran `00-roles.sql` on first start.
+  - `migrate` applied 0001–0004 as `app_owner`.
+  - `admin-cli create-super-admin` with piped input created the user and its audit row. A second run with the same email exited 1.
+  - The production `app` container logged the new admin in (argon2 on Alpine) and returned 32 permissions.
+- **Not automated:** hidden echo on a real terminal. Tests cover piped input only.
