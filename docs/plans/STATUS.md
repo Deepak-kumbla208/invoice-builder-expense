@@ -1,14 +1,14 @@
 # Implementation Status
 
-| Phase                                             | Plan                    | Status                                 |
-| ------------------------------------------------- | ----------------------- | -------------------------------------- |
-| 0 Foundation                                      | `phase-0-foundation.md` | **Done** (branch `phase-0-foundation`) |
-| 1 Access (auth, RBAC, RLS)                        | `phase-1-access.md`     | **Done** (branch `phase-1-access`)     |
-| 2 Invoices (office, GST, numbering, credit notes) | `phase-2-invoices.md`   | Not started                            |
-| 3 Expenses & reimbursements                       | `phase-3-expenses.md`   | Not started                            |
-| 4 UX (dashboard, switcher, ageing, responsive)    | `phase-4-ux.md`         | Not started                            |
-| 5 Reports & exports                               | `phase-5-reports.md`    | Not started                            |
-| 6 Hardening & ops                                 | `phase-6-hardening.md`  | Not started                            |
+| Phase                                             | Plan                    | Status                                  |
+| ------------------------------------------------- | ----------------------- | --------------------------------------- |
+| 0 Foundation                                      | `phase-0-foundation.md` | **Done** (branch `phase-0-foundation`)  |
+| 1 Access (auth, RBAC, RLS)                        | `phase-1-access.md`     | **Done** (branch `phase-1-access`)      |
+| 2 Invoices (office, GST, numbering, credit notes) | `phase-2-invoices.md`   | In progress (branch `phase-2-invoices`) |
+| 3 Expenses & reimbursements                       | `phase-3-expenses.md`   | Not started                             |
+| 4 UX (dashboard, switcher, ageing, responsive)    | `phase-4-ux.md`         | Not started                             |
+| 5 Reports & exports                               | `phase-5-reports.md`    | Not started                             |
+| 6 Hardening & ops                                 | `phase-6-hardening.md`  | Not started                             |
 
 ## User sign-off (design §3a)
 
@@ -25,8 +25,8 @@
 
 ## Current
 
-- **Active phase:** 2 (not started)
-- **Next task:** 2.1, per `docs/plans/phase-2-invoices.md`
+- **Active phase:** 2 (branch `phase-2-invoices`)
+- **Next task:** 2.2 (shared tax module), per `docs/plans/phase-2-invoices.md`
 - **Blockers:** none (note: host port 5432 is held by an unrelated `i-ticket-postgres-1` container, so the dev database is unreachable until that port is freed or remapped; a data volume created before 1.1 has no `app_owner`/`app_user` until it is recreated, see `phase-1-notes.md`)
 
 ### Phase 1 gate (2026-09-23)
@@ -61,6 +61,12 @@ New feature tests and RLS/IDOR/permission tests do not apply to Phase 0.
 ## Session log
 
 <!-- newest first, ≤10 lines per session: date · tasks done · checks run/results · next · blockers -->
+
+- 2026-09-23 · 2.1 done: characterisation tests before touching anything. The invoice maths the plan names for 2.2 is **not** in the service — the server stores what the browser computes — so the maths is pinned where it actually lives, in a new `renderer/__tests__/invoiceFunctions.test.ts` (24 cases), which is the code 2.2 ports to `shared/tax/`
+- 2.1 pinned in `services/__tests__/invoices.spec.ts` (new `invoice persistence` block, 7 cases): discount/surcharge/shipping stored verbatim, line items with their snapshot, partial payments as separate rows with the status left to the caller, `paidAt`/`closedAt` per status on add and update, the three browser-built snapshots, and duplicate content (notes, items and shipping copied; payments deliberately not)
+- 2.1 `it.todo` × 3 referencing D17 for what Phase 2 changes: numbering at issue per office and FY, server-rebuilt snapshots, and IST issue-date validation. The existing sequence tests stay green as the current-behaviour baseline; 2.4/2.5 rework them
+- 2.1 rounding quirks pinned rather than hidden, since 2.2 must decide on them: per-line discount shares are `Math.round`ed so three equal lines sharing 100 allocate only 99, and no invoice total is rounded at all today
+- 2.1 check: prettier/lint/typecheck clean, `npm test` 23 files, 197 passed + 3 todo. Next: 2.2. Not committed
 
 - 2026-09-23 · 1.9 done, **Phase 1 complete**. The 1.9 list was already met by earlier tasks except the permission matrix: the RLS harness covers exactly the 7 tables from 1.3, idle and absolute session expiry are in `auth.functions.spec.ts`, and the rest of the auth list plus the anti-escalation cases are in `auth.api.spec.ts` / `admin.api.spec.ts`
 - 1.9 new: `api/permissions.matrix.spec.ts` drives all 74 guarded routes as Super Admin, Office Admin, User and a no-permission role, asserting 403 `auth.forbidden` on exactly the routes each role's real session permissions do not cover

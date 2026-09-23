@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { createPgTestDb, type PgTestDb } from '../../../__tests__/helpers/pgTestDb';
+import { DiscountType } from '../../enums/discountType';
 import { InvoiceStatus } from '../../enums/invoiceStatus';
 import { InvoiceType } from '../../enums/invoiceType';
 import { Language } from '../../enums/language';
@@ -442,4 +443,210 @@ describe('invoice sequence handling', () => {
     expect(updated.success).toBe(true);
     expect((updated.data as Invoice).invoicePayments).toHaveLength(2);
   });
+});
+
+// Characterisation tests (plan 2.1): pin what the service does today for the behaviour Phase 2
+// intends to keep. Numbering and browser-built snapshots change under D17, so they are `it.todo`
+// notes below rather than pinned assertions.
+describe('invoice persistence (characterisation)', () => {
+  let testDb: PgTestDb;
+
+  beforeAll(async () => {
+    testDb = await createPgTestDb();
+  });
+
+  afterAll(async () => {
+    await testDb.drop();
+  });
+
+  const scope = async (tag: string) => ({
+    businessId: await insertBusiness(testDb, `Business ${tag}`, tag),
+    clientId: await insertClient(testDb, `Client ${tag}`, tag),
+    currencyId: await getCurrencyId(testDb, 'USD')
+  });
+
+  const lineItem = (itemId: number, unitPriceCents: string, quantity: string, taxRate = 0) =>
+    ({
+      itemId,
+      quantity,
+      taxRate,
+      invoiceItemSnapshot: { parentInvoiceItemId: 0, itemName: `Item ${itemId}`, unitPriceCents, unitName: 'pcs' }
+    }) as unknown as NonNullable<NewInvoicePayload['invoiceItems']>[number];
+
+  const insertItem = (name: string) =>
+    testDb.withTx(db => db.run(`INSERT INTO items ("name", "amount") VALUES (?, ?)`, [name, '1000'], true));
+
+  const payments = (...amounts: string[]) =>
+    amounts.map(
+      amountCents =>
+        ({ paidAt: new Date().toISOString(), paymentMethod: 'Cash', amountCents }) as unknown as NonNullable<
+          NewInvoicePayload['invoicePayments']
+        >[number]
+    );
+
+  it('stores the discount, surcharge and shipping the browser sends, without recomputing them', async () => {
+    const { businessId, clientId, currencyId } = await scope('DS');
+    const payload = createInvoicePayload(businessId, clientId, currencyId, '000001');
+    payload.discountName = 'Launch';
+    payload.discountType = DiscountType.percentage;
+    payload.discountPercent = 10;
+    payload.discountAmountCents = '0';
+    payload.surchargeName = 'Rush';
+    payload.surchargeType = DiscountType.fixed;
+    payload.surchargeAmountCents = '750';
+    payload.shippingFeeCents = '1500';
+
+    const added = await testDb.withTx(db => addInvoice(db, payload));
+    expect(added.success).toBe(true);
+
+    const stored = added.data as Invoice;
+    expect({
+      discountName: stored.discountName,
+      discountType: stored.discountType,
+      discountPercent: Number(stored.discountPercent),
+      discountAmountCents: String(stored.discountAmountCents),
+      surchargeName: stored.surchargeName,
+      surchargeType: stored.surchargeType,
+      surchargeAmountCents: String(stored.surchargeAmountCents),
+      shippingFeeCents: String(stored.shippingFeeCents)
+    }).toEqual({
+      discountName: 'Launch',
+      discountType: DiscountType.percentage,
+      discountPercent: 10,
+      discountAmountCents: '0',
+      surchargeName: 'Rush',
+      surchargeType: DiscountType.fixed,
+      surchargeAmountCents: '750',
+      shippingFeeCents: '1500'
+    });
+  });
+
+  it('stores line items with their snapshot, keeping the unit price as sent', async () => {
+    const { businessId, clientId, currencyId } = await scope('LI');
+    const itemId = await insertItem('Widget');
+    const payload = createInvoicePayload(businessId, clientId, currencyId, '000001');
+    payload.invoiceItems = [lineItem(itemId, '12345', '3', 18)];
+
+    const stored = (await testDb.withTx(db => addInvoice(db, payload))).data as Invoice;
+    expect(stored.invoiceItems).toHaveLength(1);
+    expect(String(stored.invoiceItems![0].quantity)).toBe('3');
+    expect(Number(stored.invoiceItems![0].taxRate)).toBe(18);
+    expect(String(stored.invoiceItems![0].invoiceItemSnapshot!.unitPriceCents)).toBe('12345');
+    expect(stored.invoiceItems![0].invoiceItemSnapshot!.itemName).toBe(`Item ${itemId}`);
+  });
+
+  it('keeps every partial payment as its own row and leaves the status to the caller', async () => {
+    const { businessId, clientId, currencyId } = await scope('PP');
+    const payload = createInvoicePayload(businessId, clientId, currencyId, '000001');
+    payload.status = InvoiceStatus.partiallyPaid;
+    payload.invoicePayments = payments('2500', '1000');
+
+    const stored = (await testDb.withTx(db => addInvoice(db, payload))).data as Invoice;
+    expect(stored.invoicePayments).toHaveLength(2);
+    expect(stored.invoicePayments!.reduce((sum, p) => sum + Number(p.amountCents), 0)).toBe(3500);
+    // The service never derives the status from the payments; it stores what it was given.
+    expect(stored.status).toBe(InvoiceStatus.partiallyPaid);
+  });
+
+  it('sets paidAt for paid, closedAt for closed, and neither for unpaid or partially paid', async () => {
+    const { businessId, clientId, currencyId } = await scope('ST');
+
+    const withStatus = async (status: InvoiceStatus, invoiceNumber: string) => {
+      const payload = createInvoicePayload(businessId, clientId, currencyId, invoiceNumber);
+      payload.status = status;
+      const stored = (await testDb.withTx(db => addInvoice(db, payload))).data as Invoice;
+      return { paidAt: Boolean(stored.paidAt), closedAt: Boolean(stored.closedAt) };
+    };
+
+    expect(await withStatus(InvoiceStatus.paid, '000001')).toEqual({ paidAt: true, closedAt: false });
+    expect(await withStatus(InvoiceStatus.closed, '000002')).toEqual({ paidAt: false, closedAt: true });
+    expect(await withStatus(InvoiceStatus.unpaid, '000003')).toEqual({ paidAt: false, closedAt: false });
+    expect(await withStatus(InvoiceStatus.partiallyPaid, '000004')).toEqual({ paidAt: false, closedAt: false });
+  });
+
+  it('moves an invoice between statuses on update, clearing the timestamp that no longer applies', async () => {
+    const { businessId, clientId, currencyId } = await scope('SU');
+    const added = (
+      await testDb.withTx(db => addInvoice(db, createInvoicePayload(businessId, clientId, currencyId, '000001')))
+    ).data as Invoice;
+
+    const paid = (await testDb.withTx(db => updateInvoice(db, { ...added, status: InvoiceStatus.paid })))
+      .data as Invoice;
+    expect(Boolean(paid.paidAt)).toBe(true);
+    expect(Boolean(paid.closedAt)).toBe(false);
+
+    const closed = (await testDb.withTx(db => updateInvoice(db, { ...paid, status: InvoiceStatus.closed })))
+      .data as Invoice;
+    expect(Boolean(closed.paidAt)).toBe(false);
+    expect(Boolean(closed.closedAt)).toBe(true);
+  });
+
+  it('stores the business, client and currency snapshots the browser built', async () => {
+    const { businessId, clientId, currencyId } = await scope('SN');
+    const payload = createInvoicePayload(businessId, clientId, currencyId, '000001');
+    payload.invoiceBusinessSnapshot.businessName = 'Snapshot Co';
+    payload.invoiceBusinessSnapshot.businessEmail = 'books@snapshot.test';
+    payload.invoiceClientSnapshot.clientName = 'Snapshot Client';
+    payload.invoiceClientSnapshot.clientEmail = 'ap@client.test';
+
+    const stored = (await testDb.withTx(db => addInvoice(db, payload))).data as Invoice;
+    expect(stored.invoiceBusinessSnapshot).toMatchObject({
+      businessName: 'Snapshot Co',
+      businessEmail: 'books@snapshot.test'
+    });
+    expect(stored.invoiceClientSnapshot).toMatchObject({
+      clientName: 'Snapshot Client',
+      clientEmail: 'ap@client.test'
+    });
+    expect(stored.invoiceCurrencySnapshot).toMatchObject({
+      currencyCode: 'USD',
+      currencySymbol: '$',
+      currencySubunit: 100
+    });
+  });
+
+  it('copies notes, items and snapshots into a duplicate, but not its payments', async () => {
+    const { businessId, clientId, currencyId } = await scope('DU');
+    const itemId = await insertItem('Duplicated widget');
+    const payload = createInvoicePayload(businessId, clientId, currencyId, '000001');
+    payload.customerNotes = 'Thanks for your business';
+    payload.termsConditionNotes = 'Net 30';
+    payload.shippingFeeCents = '900';
+    payload.invoiceItems = [lineItem(itemId, '5000', '2')];
+    payload.invoicePayments = payments('1000');
+
+    const original = (await testDb.withTx(db => addInvoice(db, payload))).data as Invoice;
+    const duplicated = await testDb.withTx(db => duplicateInvoice(db, original.id as number, InvoiceType.invoice));
+    expect(duplicated.success).toBe(true);
+
+    const copy = await testDb.withTx(db =>
+      db.get<{ id: number; customerNotes: string; termsConditionNotes: string; shippingFeeCents: string }>(
+        `SELECT "id", "customerNotes", "termsConditionNotes", "shippingFeeCents"
+         FROM invoices WHERE "businessId" = ? AND "invoiceNumber" = ?`,
+        [businessId, '000002']
+      )
+    );
+    expect(copy).toMatchObject({
+      customerNotes: 'Thanks for your business',
+      termsConditionNotes: 'Net 30',
+      shippingFeeCents: '900'
+    });
+
+    const counts = await testDb.withTx(async db => ({
+      items: await db.get<{ count: string }>(`SELECT count(*) FROM invoice_items WHERE "parentInvoiceId" = ?`, [
+        copy!.id
+      ]),
+      payments: await db.get<{ count: string }>(`SELECT count(*) FROM invoice_payments WHERE "parentInvoiceId" = ?`, [
+        copy!.id
+      ])
+    }));
+    expect(Number(counts.items!.count)).toBe(1);
+    // A duplicate starts unpaid: the original's payments are deliberately not carried over.
+    expect(Number(counts.payments!.count)).toBe(0);
+  });
+
+  // D17: the server, not the browser, owns these once Phase 2 lands.
+  it.todo('D17: assigns the number at issue, per office and financial year, leaving drafts unnumbered');
+  it.todo('D17: rebuilds the business, client, office and currency snapshots server-side at issue');
+  it.todo('D17: validates the issue date against the IST calendar: chronological and not in the future');
 });
