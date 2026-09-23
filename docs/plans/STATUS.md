@@ -3,7 +3,7 @@
 | Phase                                             | Plan                    | Status                                 |
 | ------------------------------------------------- | ----------------------- | -------------------------------------- |
 | 0 Foundation                                      | `phase-0-foundation.md` | **Done** (branch `phase-0-foundation`) |
-| 1 Access (auth, RBAC, RLS)                        | `phase-1-access.md`     | In progress (branch `phase-1-access`)  |
+| 1 Access (auth, RBAC, RLS)                        | `phase-1-access.md`     | **Done** (branch `phase-1-access`)     |
 | 2 Invoices (office, GST, numbering, credit notes) | `phase-2-invoices.md`   | Not started                            |
 | 3 Expenses & reimbursements                       | `phase-3-expenses.md`   | Not started                            |
 | 4 UX (dashboard, switcher, ageing, responsive)    | `phase-4-ux.md`         | Not started                            |
@@ -25,9 +25,23 @@
 
 ## Current
 
-- **Active phase:** 1 (branch `phase-1-access`)
-- **Next task:** 1.9 (phase gate), per `docs/plans/phase-1-access.md`
+- **Active phase:** 2 (not started)
+- **Next task:** 2.1, per `docs/plans/phase-2-invoices.md`
 - **Blockers:** none (note: host port 5432 is held by an unrelated `i-ticket-postgres-1` container, so the dev database is unreachable until that port is freed or remapped; a data volume created before 1.1 has no `app_owner`/`app_user` until it is recreated, see `phase-1-notes.md`)
+
+### Phase 1 gate (2026-09-23)
+
+| Check                  | Command                      | Result                                                          |
+| ---------------------- | ---------------------------- | --------------------------------------------------------------- |
+| Formatting             | `npx prettier --check .`     | clean                                                           |
+| Lint                   | `npm run lint`               | clean                                                           |
+| Types                  | `npm run typecheck`          | clean (3 tsconfigs)                                             |
+| Unit + integration     | `npm test`                   | 22 files, 166/166 (stable over 4 consecutive runs)              |
+| Build                  | `npm run build`              | `dist-fe` + `dist-be`, 5 migrations copied                      |
+| Invoice regression e2e | `npm run test:e2e`           | 3/3 incl. the regression as Super Admin, on a 5433 scratch DB   |
+| RLS / IDOR             | `rls/access.rls.spec.ts`     | all 7 scoped tables from 1.3, reads and writes both ways        |
+| Permission matrix      | `permissions.matrix.spec.ts` | 4 roles × 74 guarded routes                                     |
+| Route guards           | `routes.permissions.spec.ts` | every route declares one rule; rules match the checked-in table |
 
 ### Phase 0 gate (2026-09-16)
 
@@ -47,6 +61,13 @@ New feature tests and RLS/IDOR/permission tests do not apply to Phase 0.
 ## Session log
 
 <!-- newest first, ≤10 lines per session: date · tasks done · checks run/results · next · blockers -->
+
+- 2026-09-23 · 1.9 done, **Phase 1 complete**. The 1.9 list was already met by earlier tasks except the permission matrix: the RLS harness covers exactly the 7 tables from 1.3, idle and absolute session expiry are in `auth.functions.spec.ts`, and the rest of the auth list plus the anti-escalation cases are in `auth.api.spec.ts` / `admin.api.spec.ts`
+- 1.9 new: `api/permissions.matrix.spec.ts` drives all 74 guarded routes as Super Admin, Office Admin, User and a no-permission role, asserting 403 `auth.forbidden` on exactly the routes each role's real session permissions do not cover
+- 1.9 new: `routes.permissions.spec.ts` now holds a checked-in route → rule table for all 74 routes, replacing its sampled assertions. The matrix alone could not catch a _loosened_ guard, since it derives expectations from the declared rule; the table can
+- 1.9 both specs mutation-tested: weakening `audit.view` to `requireAuthenticated()` fails the table, and making the guard always allow fails the matrix for 3 of the 4 roles. Both mutations reverted
+- 1.9 gate: all green, see the table above. E2E ran against a scratch DB on the test instance (5433), so the blocked 5432 port did not stand in the way
+- **Next:** Phase 2, task 2.1. Not committed
 
 - 2026-09-23 · 1.8 done (A1): deleted `GET /api/export` + `POST /api/import`, their controller and `services/importExport.ts`, and the settings "App backup" card with its `useExportJson`/`useImportJson` hooks and `exportAllData`/`importAllData` API-client calls. The import confirmation dialog and the settings re-fetch that only existed to refresh after a restore went with them
 - 1.8 kept, per the task: list XLSX export everywhere and customer/item XLSX import. Invoice XLSX import was already off (`showOnlyExport` on the invoices page), and there was never an invoice import route — the JSON restore was the only way to write invoices in bulk, and it is gone

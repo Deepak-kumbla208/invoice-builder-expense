@@ -225,3 +225,43 @@ Sign-off A1: remove the unscoped JSON export/import and invoice import.
 - **Not run:** e2e. It needs the dev database on 5432, still held by another project's container,
   and it belongs to the 1.9 gate. No e2e spec touches the removed UI — the only "export" in them
   is the invoice PDF.
+
+## Task 1.9 decisions (phase gate)
+
+Most of the 1.9 list was already met by earlier tasks. The audit:
+
+| 1.9 item                                      | Where                                                     |
+| --------------------------------------------- | --------------------------------------------------------- |
+| wrong password, lockout, rotation on login    | `api/auth.api.spec.ts`                                    |
+| idle and absolute expiry                      | `auth.functions.spec.ts` (expiry lives in `auth_session`) |
+| CSRF missing/invalid → 403, logout revokes    | `api/auth.api.spec.ts`                                    |
+| `must_change_password` gate                   | `api/auth.api.spec.ts`                                    |
+| revocation on role/office/password/deactivate | `api/admin.api.spec.ts`                                   |
+| **no** revocation on role _edit_              | `api/admin.api.spec.ts`                                   |
+| anti-escalation                               | `api/admin.api.spec.ts`, `rls/access.rls.spec.ts`         |
+| RLS harness over every 1.3 table              | `rls/access.rls.spec.ts` (its 7 tables match 1.3 exactly) |
+| permission matrix                             | **new**, below                                            |
+
+- **`api/permissions.matrix.spec.ts`.** Enumerates the Express router, then drives all 74 guarded
+  routes as four users: Super Admin, Office Admin, User and a role holding nothing. Path params
+  become `999999` so an allowed request answers 404 instead of mutating the seed, and writes send
+  `{}`.
+  - Expectations come from each route's declared rule plus the permission set the role's **real
+    session** returns from `/api/auth/me`, so it exercises the whole 0003 seed → `auth_session` →
+    `expandPermissions` → guard pipeline rather than a re-implementation of it.
+  - Denied means exactly `403 auth.forbidden`. Allowed means "not 403 and not 401" — an allowed
+    write with an empty body legitimately answers 400 or 404, and this spec tests the gate, not the
+    handlers.
+- **Checked-in rule table in `routes.permissions.spec.ts`.** The matrix derives its expectations
+  from the declared rule, so it cannot catch a rule being _loosened_ — both sides move together.
+  The spec now carries an explicit route → rule map for all 74 routes, and its earlier sampled
+  assertions are gone, being strictly subsumed.
+- **Both specs were mutation-tested**, since a green test that cannot fail proves nothing:
+  - `requirePermission('audit.view')` → `requireAuthenticated()` on `/api/audit-logs`: the table
+    fails with a one-line diff; the matrix stays green, which is exactly the gap it cannot cover.
+  - `guard` changed to always allow: the matrix fails for Office Admin, User and No Access; the
+    table stays green. The two specs cover the two failure modes between them.
+  - Both mutations reverted; `git diff` on the two production files is empty.
+- **E2E ran.** Against a scratch database on the test instance (5433) with
+  `E2E_MIGRATION_DATABASE_URL`, so the blocked 5432 dev port was not in the way: 3/3, including the
+  invoice regression as a Super Admin. The scratch database was dropped afterwards.
