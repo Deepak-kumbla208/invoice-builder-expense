@@ -6,7 +6,6 @@ import { initBusinessesController } from './businesses';
 import { initCategoriesController } from './categories';
 import { initClientsController } from './clients';
 import { initCurrenciesController } from './currencies';
-import { initImportExportController } from './importExport';
 import { initInvoicesController } from './invoices';
 import { initItemsController } from './items';
 import { initLayoutsController } from './layouts';
@@ -19,7 +18,6 @@ import { initUnitsController } from './units';
 import { initUsersController } from './users';
 
 export const initControllers = (app: Express, deps: ServerDeps) => {
-  initImportExportController(app, deps);
   initLayoutsController(app, deps);
   initBusinessesController(app, deps);
   initCategoriesController(app, deps);

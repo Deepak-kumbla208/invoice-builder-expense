@@ -1,4 +1,3 @@
-import { gzip } from 'pako';
 import type { EInvoice } from '../enums/einvoice';
 import type { InvoiceType } from '../enums/invoiceType';
 import type {
@@ -546,53 +545,7 @@ export const webApi = () => {
         data: response.data && mapInvoiceFromWeb(response.data)
       };
     },
-    deleteInvoice: (id: number) => apiDelete<Response<unknown>>(`/api/invoices/${id}`),
-
-    exportAllData: async (): Promise<Response<ExportMeta>> => {
-      const result = await apiGet<{ success: boolean; data?: unknown }>('/api/export');
-      if (!result.success || !result.data) return result as Response<ExportMeta>;
-      const blob = new Blob([JSON.stringify(result.data, null, 2)], { type: 'application/json' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `invoice-builder-backup-${new Date().toISOString().slice(0, 10)}.json`;
-      a.click();
-      URL.revokeObjectURL(a.href);
-      return { success: true, data: { filePath: a.download } };
-    },
-
-    importAllData: (): Promise<Response<unknown>> => {
-      return new Promise(resolve => {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.json,application/json';
-        input.onchange = async () => {
-          const file = input.files?.[0];
-          if (!file) {
-            resolve({ success: false });
-            return;
-          }
-          const text = await file.text();
-          let parsed: unknown;
-          try {
-            parsed = JSON.parse(text);
-          } catch {
-            resolve({ success: false, key: 'error.invalidFile' });
-            return;
-          }
-
-          const jsonString = JSON.stringify(parsed);
-          const compressed = gzip(jsonString);
-
-          const blob = new Blob([compressed], { type: 'application/gzip' });
-          const formData = new FormData();
-          formData.append('file', blob, file.name + '.gz');
-
-          const result = await apiPost<Response<unknown>>('/api/import', formData);
-          resolve(result);
-        };
-        input.click();
-      });
-    }
+    deleteInvoice: (id: number) => apiDelete<Response<unknown>>(`/api/invoices/${id}`)
   };
 };
 

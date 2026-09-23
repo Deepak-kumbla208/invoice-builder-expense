@@ -1,4 +1,4 @@
-import { DarkMode, Description, FileDownload, Language, LightMode } from '@mui/icons-material';
+import { DarkMode, Description, Language, LightMode } from '@mui/icons-material';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import CoffeeIcon from '@mui/icons-material/Coffee';
 import ColorLensIcon from '@mui/icons-material/ColorLens';
@@ -10,7 +10,6 @@ import ReceiptIcon from '@mui/icons-material/Receipt';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import ShareIcon from '@mui/icons-material/Share';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
-import UploadFileIcon from '@mui/icons-material/UploadFile';
 import { Box, Card, CardContent, Grid, Typography, useTheme } from '@mui/material';
 import { useContext, type FC } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -32,8 +31,6 @@ interface Props {
   togglePresets?: (value: boolean) => void;
   toggleUBL?: (value: boolean) => void;
   toggleXRechnung?: (value: boolean) => void;
-  onExportJSON?: () => void;
-  onImportJSON?: () => void;
 }
 export const Menu: FC<Props> = ({
   onSelected = () => {},
@@ -44,8 +41,6 @@ export const Menu: FC<Props> = ({
   togglePresets = () => {},
   toggleUBL = () => {},
   onModeChange = () => {},
-  onExportJSON = () => {},
-  onImportJSON = () => {},
   toggleXRechnung = () => {}
 }) => {
   const { mode, toggleMode } = useContext(ThemeContext);
@@ -161,29 +156,6 @@ export const Menu: FC<Props> = ({
     }
   ];
 
-  const appBackup = [
-    {
-      items: [
-        {
-          text: t('settingsMenuItems.titles.import'),
-          description: t('settingsMenuItems.descriptions.import'),
-          icon: <UploadFileIcon />,
-          isSelected: false,
-          isToggle: false,
-          onClick: onImportJSON
-        },
-        {
-          text: t('settingsMenuItems.titles.export'),
-          description: t('settingsMenuItems.descriptions.export'),
-          icon: <FileDownload />,
-          isSelected: false,
-          isToggle: false,
-          onClick: onExportJSON
-        }
-      ]
-    }
-  ];
-
   const githubLinks = [
     {
       items: [
@@ -290,11 +262,6 @@ export const Menu: FC<Props> = ({
           <Card>
             <CardContent>
               <MenuList useTooltip={false} items={featureToggles} showText={true} />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent>
-              <MenuList useTooltip={false} items={appBackup} showText={true} />
             </CardContent>
           </Card>
           <Card>

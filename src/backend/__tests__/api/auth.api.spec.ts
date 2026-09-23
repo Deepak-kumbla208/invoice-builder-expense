@@ -242,6 +242,11 @@ describe('auth API', () => {
       expect(res.status).toBe(404);
       expect(res.body).toEqual({ success: false, key: 'error.notFound', message: 'Not found' });
     });
+
+    it('no longer serves the unscoped JSON backup routes, even to a Super Admin (A1)', async () => {
+      expect((await server.request('GET', '/api/export', { session: root })).status).toBe(404);
+      expect((await server.request('POST', '/api/import', { session: root, body: {} })).status).toBe(404);
+    });
   });
 
   describe('forced password change', () => {

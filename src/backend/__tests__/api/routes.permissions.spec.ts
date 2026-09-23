@@ -53,6 +53,10 @@ describe('route permissions', () => {
     ).toEqual([...UNGUARDED].sort());
   });
 
+  it('no longer registers the unscoped JSON backup routes (A1)', () => {
+    expect(routes.map(entry => entry.route).filter(route => /^\w+ \/api\/(export|import)$/.test(route))).toEqual([]);
+  });
+
   it('guards writes with the invoice, customer, company and setup permissions', () => {
     const rule = (route: string) => routes.find(entry => entry.route === route)?.rules[0];
     expect(rule('POST /api/invoices')).toEqual({ mode: 'all', keys: ['invoice.create'] });

@@ -26,7 +26,7 @@
 ## Current
 
 - **Active phase:** 1 (branch `phase-1-access`)
-- **Next task:** 1.8, per `docs/plans/phase-1-access.md`
+- **Next task:** 1.9 (phase gate), per `docs/plans/phase-1-access.md`
 - **Blockers:** none (note: host port 5432 is held by an unrelated `i-ticket-postgres-1` container, so the dev database is unreachable until that port is freed or remapped; a data volume created before 1.1 has no `app_owner`/`app_user` until it is recreated, see `phase-1-notes.md`)
 
 ### Phase 0 gate (2026-09-16)
@@ -47,6 +47,11 @@ New feature tests and RLS/IDOR/permission tests do not apply to Phase 0.
 ## Session log
 
 <!-- newest first, ≤10 lines per session: date · tasks done · checks run/results · next · blockers -->
+
+- 2026-09-23 · 1.8 done (A1): deleted `GET /api/export` + `POST /api/import`, their controller and `services/importExport.ts`, and the settings "App backup" card with its `useExportJson`/`useImportJson` hooks and `exportAllData`/`importAllData` API-client calls. The import confirmation dialog and the settings re-fetch that only existed to refresh after a restore went with them
+- 1.8 kept, per the task: list XLSX export everywhere and customer/item XLSX import. Invoice XLSX import was already off (`showOnlyExport` on the invoices page), and there was never an invoice import route — the JSON restore was the only way to write invoices in bulk, and it is gone
+- 1.8 also: `encodeInvoiceExport`/`decodeInvoiceImport` (dead once the service went) removed from `dataUrlFunctions.ts`; `multer`, `pako` and their `@types` uninstalled, now unused; 8 orphaned i18n keys pruned in 5 locales
+- 1.8 check: 2 new cases (the router registers no `/api/export|import`; both answer 404 to a Super Admin) → `npm test` 21 files, 160/160; prettier/lint/typecheck clean; `npm run build` green. E2E not run — it needs the dev DB on 5432, still held by another container; it belongs to the 1.9 gate and no e2e spec touches the removed UI. Not committed
 
 - 2026-09-23 · fixed the intermittent `admin.api.spec.ts` failures under `npm test`. Cause was **not** the login limiter (erin peaks at 4 of 5 in every run, and a standalone probe never saw a late decrement): it is vitest's 5 s default `testTimeout` against argon2-heavy cases that take ~1 s idle. `testTimeout`/`hookTimeout` → 30 s in `vite.config.ts`; the v2 PDF test's local 20 s override removed
 - The `expected 401 to be 403` in the audit test was a cascade — the timed-out reset-password test never re-logs erin in, leaving a revoked cookie. That assertion now uses `carol`, a User the admin tests never mutate

@@ -191,3 +191,37 @@ requires audit.view" with `expected 401 to be 403`.
     so its lockout case still exercises the real limits.
 - **Verified.** 3 full-suite runs under the 10-hog load that previously failed 4-5 tests every run,
   then 5 clean `lint` + `typecheck` + `npm test` runs: 21 files, 158/158 each time.
+
+## Task 1.8 decisions
+
+Sign-off A1: remove the unscoped JSON export/import and invoice import.
+
+- **Deleted.** `GET /api/export` and `POST /api/import` with `controllers/importExport.ts` and
+  `shared/services/importExport.ts`; the renderer's `exportAllData`/`importAllData`, the
+  `shared/hooks/backup/` pair, and the settings menu's "App backup" card.
+  - The import confirmation dialog and the `useSettingsRetrieve` call in the settings page went
+    with them: both existed only to warn about, and recover from, a full-database restore.
+  - `importAllData` deleted every row in 22 tables and re-inserted with `OVERRIDING SYSTEM VALUE`,
+    ignoring `business_id`/`office_id` entirely. There is no scoped version of that to keep, which
+    is what A1 rules on.
+- **Invoice import.** There was never an invoice import route; the invoices page has been
+  `showOnlyExport` since before this phase. The JSON restore was the only bulk write path into
+  `invoices`, so removing it completes A1 with no separate change.
+- **Kept**, per the task: list XLSX export on every page, and customer/item XLSX import through
+  `CRUDPage` → `/api/{clients,items}/batch`. Their company scoping lands in Phase 2, so
+  `common.importExport` and the `ImportExportButton` stay.
+- **Fallout cleaned up.** `encodeInvoiceExport` and `decodeInvoiceImport` in `dataUrlFunctions.ts`
+  were only ever called by the deleted service — removed, along with the file's now-unused
+  `Invoice` type import. Every other `encode*`/`decode*` there is still reached through
+  `encodeInvoice`/`decodeInvoice` or an `encodeResult*` helper, so they stay.
+  - `multer`, `pako`, `@types/multer` and `@types/pako` uninstalled: the deleted upload route and
+    the gzip in the client were their only users.
+  - 8 orphaned i18n keys pruned in all 5 locales: `settingsMenuItems.titles.{import,export}`,
+    `settingsMenuItems.descriptions.{import,export}`, `settingsMenuItems.importConfirmText`, and
+    `common.{exported,exportedTo,imported}`.
+- **Tests.** `routes.permissions.spec.ts` asserts the router registers no `/api/export` or
+  `/api/import`; `auth.api.spec.ts` asserts both answer 404 to a Super Admin, so a reintroduction
+  fails at both the wiring and the behaviour level.
+- **Not run:** e2e. It needs the dev database on 5432, still held by another project's container,
+  and it belongs to the 1.9 gate. No e2e spec touches the removed UI — the only "export" in them
+  is the invoice PDF.
