@@ -152,7 +152,42 @@
 - **E2E:** `e2e/helpers/auth.ts` creates a Super Admin through the CLI (it needs `E2E_MIGRATION_DATABASE_URL`, and specs skip without it) and signs in.
   - The new `auth-shell.spec.ts` covers: returnTo, a wrong password, company, office (GSTIN check), a user with a temporary password, sign-out, the forced change, the User role's menu, the no-access page, and signing in again.
   - The invoice regression and layouts specs now sign in first. They also use `/companies` and `COMPANY *`, with timeouts of 180 s and 60 s.
-- **Test flakes:**
-  - The v2 PDF multi-page test now has a 20 s timeout. It takes 2.3 s alone but more than 5 s under the parallel suite, and it failed on the untouched 1.6 baseline too.
-  - `admin.api.spec.ts` sometimes fails under full-suite load, apparently because the "skip successful requests" login limiter decrements after the next login arrives. It passes on its own. Flagged separately, not fixed here.
+- **Test flakes:** diagnosed and fixed in the 2026-09-23 session below. The 1.7 guess (a login-limiter race) was wrong; the cause was the 5 s default test timeout.
 - **Not in 1.7:** the office switcher and the mobile drawer (Phase 4); hiding write buttons from read-only users inside pages (the server enforces this); the invoice XLSX export sheet still called "Business Snapshots" (1.8 reworks import/export).
+
+## Suite flakiness under load (2026-09-23)
+
+`admin.api.spec.ts` intermittently failed two cases under `npm test` while passing alone:
+"resets passwords within scope…" and, right after it, "shows office admins only their scope and
+requires audit.view" with `expected 401 to be 403`.
+
+- **Not the cause.** The suspect was the 5-per-15-min login limiter (`skipSuccessfulRequests`
+  decrements on the response's `finish` promise, so in principle a later login can be counted
+  before the decrement lands). Instrumenting `req.rateLimit` showed erin peaks at `used=4`
+  against a limit of 5 (blocked at 6) in every run, loaded or not, and a standalone probe that
+  hammered a limiter with a hogged event loop never saw a decrement land late. Connection
+  exhaustion was ruled out too: the suite peaks at 13 of 100 postgres connections.
+- **The cause.** Vitest's 5 s default `testTimeout`. The argon2-heavy cases run ~1 s on an idle
+  machine ("resets passwords…" 1029 ms, "revokes a user's sessions…" 766 ms, auth's "forced
+  password change" 947 ms). One fork per core, each hashing with argon2's own 4 threads, eats
+  that 5x margin. Reproduced reliably by running the suite against 10 busy-loop processes: the
+  same two admin cases plus auth's forced-password-change and two jsdom renderer tests timed out
+  in every run.
+- **The 401 was a cascade.** The reset-password test revokes erin's session and re-logs her in on
+  its last line. When the test times out before that line, `sessions.erin` still holds the revoked
+  cookie, so the next describe's call answers 401 instead of 403 — a misleading second failure
+  from a single root cause.
+- **Fixes.**
+  - `vite.config.ts`: `testTimeout` and `hookTimeout` raised to 30 s. The per-test 20 s override on
+    the v2 PDF multi-page case is removed — it was a local workaround for the same 5 s default and
+    would now be tighter than the suite.
+  - `admin.api.spec.ts` asserts the audit-view 403 as `carol`, a plain User the admin tests never
+    mutate, so it no longer depends on how the password tests ended. `carol` joins the `beforeAll`
+    login loop.
+  - `createApp` takes `loginRateLimit: { ipLimit, emailLimit }`, defaulting to the production 50
+    and 5, threaded to `loginLimiters()`. `admin.api.spec.ts` relaxes both to 1000, since it logs
+    the same users in repeatedly and is not testing rate limits. Two spare hits out of five was
+    thin enough to become the next flake as the spec grows. `auth.api.spec.ts` passes no options,
+    so its lockout case still exercises the real limits.
+- **Verified.** 3 full-suite runs under the 10-hog load that previously failed 4-5 tests every run,
+  then 5 clean `lint` + `typecheck` + `npm test` runs: 21 files, 158/158 each time.

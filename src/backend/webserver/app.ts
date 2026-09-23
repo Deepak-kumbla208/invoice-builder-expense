@@ -3,7 +3,7 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import helmet from 'helmet';
 import { APP_CONFIG } from './config';
 import { initControllers } from './controllers';
-import { initAuthController } from './controllers/auth';
+import { initAuthController, type LoginRateLimit } from './controllers/auth';
 import type { ServerDeps } from './deps';
 import { csrfProtection } from './middleware/csrf';
 import { errorHandler, notFoundHandler } from './middleware/errors';
@@ -12,9 +12,12 @@ import { createSessionMiddleware, passwordChangeGate, requireAuth } from './midd
 const LARGE_BODY_ROUTES = ['/api/invoices', '/api/businesses', '/api/presets', '/api/styleProfiles'];
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH']);
 
-export type AppOptions = { appOrigin?: string };
+export type AppOptions = { appOrigin?: string; loginRateLimit?: LoginRateLimit };
 
-export const createApp = (deps: ServerDeps, { appOrigin = process.env.APP_ORIGIN || undefined }: AppOptions = {}) => {
+export const createApp = (
+  deps: ServerDeps,
+  { appOrigin = process.env.APP_ORIGIN || undefined, loginRateLimit }: AppOptions = {}
+) => {
   const app = express();
   app.set('trust proxy', 1);
   app.use(helmet());
@@ -43,7 +46,7 @@ export const createApp = (deps: ServerDeps, { appOrigin = process.env.APP_ORIGIN
   });
 
   app.use('/api', createSessionMiddleware(deps.withTx));
-  initAuthController(app, deps, appOrigin);
+  initAuthController(app, deps, appOrigin, loginRateLimit);
 
   app.use('/api', requireAuth, passwordChangeGate, csrfProtection);
   initControllers(app, deps);

@@ -130,8 +130,9 @@ describe('admin API', () => {
       };
     });
 
-    server = await startTestServer(testDb);
-    for (const name of ['root', 'alice', 'rita', 'gloria', 'erin']) {
+    // These tests log the same users in repeatedly; auth.api.spec owns the real limits.
+    server = await startTestServer(testDb, { loginRateLimit: { ipLimit: 1000, emailLimit: 1000 } });
+    for (const name of ['root', 'alice', 'rita', 'gloria', 'erin', 'carol']) {
       sessions[name] = await login(`${name}@example.com`);
     }
   });
@@ -559,7 +560,7 @@ describe('admin API', () => {
       expect(
         items.every(item => item.officeId === s.officeA1 || (item.officeId === null && item.businessId === s.companyA))
       ).toBe(true);
-      expect((await call('erin', 'GET', '/api/audit-logs')).status).toBe(403);
+      expect((await call('carol', 'GET', '/api/audit-logs')).status).toBe(403);
     });
   });
 });

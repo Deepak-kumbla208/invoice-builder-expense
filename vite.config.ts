@@ -46,6 +46,11 @@ export default defineConfig(({ mode }) => {
       globals: true,
       environment: 'jsdom',
       setupFiles: './setupTests.ts',
+      // Argon2 hashing, PostgreSQL round trips and jsdom PDF layout run about a
+      // second each on an idle machine; with one fork per core they lose more
+      // than the 5 s default to contention, so the slow tests need real headroom.
+      testTimeout: 30_000,
+      hookTimeout: 30_000,
       coverage: {
         include: ['src/**'],
         exclude: ['src/**/vite-env.d.ts', 'src/**/main.tsx', 'src/**/reportWebVitals.ts', 'src/**/mocks'],

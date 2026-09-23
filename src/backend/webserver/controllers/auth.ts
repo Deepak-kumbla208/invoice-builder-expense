@@ -24,6 +24,10 @@ import {
 } from '../middleware/session';
 
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_IP_LIMIT = 50;
+const LOGIN_EMAIL_LIMIT = 5;
+
+export type LoginRateLimit = { ipLimit?: number; emailLimit?: number };
 
 const loginSchema = z.object({
   email: z.string().trim().min(1).max(254),
@@ -47,17 +51,17 @@ const tooManyAttempts = (_req: Request, res: Response) => {
   res.status(429).json({ success: false, key: 'auth.tooManyAttempts', message: 'auth.tooManyAttempts' });
 };
 
-const loginLimiters = () => [
+const loginLimiters = ({ ipLimit = LOGIN_IP_LIMIT, emailLimit = LOGIN_EMAIL_LIMIT }: LoginRateLimit = {}) => [
   rateLimit({
     windowMs: LOGIN_WINDOW_MS,
-    limit: 50,
+    limit: ipLimit,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
     handler: tooManyAttempts
   }),
   rateLimit({
     windowMs: LOGIN_WINDOW_MS,
-    limit: 5,
+    limit: emailLimit,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
     skipSuccessfulRequests: true,
@@ -69,7 +73,12 @@ const loginLimiters = () => [
   })
 ];
 
-export const initAuthController = (app: Express, { withTx, requestTx }: ServerDeps, appOrigin: string | undefined) => {
+export const initAuthController = (
+  app: Express,
+  { withTx, requestTx }: ServerDeps,
+  appOrigin: string | undefined,
+  loginRateLimit?: LoginRateLimit
+) => {
   const logEvent = (actorId: number | null, action: string, req: Request, meta: Record<string, unknown> = {}) =>
     withTx(db => db.query('SELECT auth_log_event(?, ?, ?, ?)', [actorId, action, req.ip ?? null, meta]));
 
@@ -98,45 +107,50 @@ export const initAuthController = (app: Express, { withTx, requestTx }: ServerDe
     };
   };
 
-  app.post('/api/auth/login', requireSameOrigin(appOrigin), ...loginLimiters(), async (req: Request, res: Response) => {
-    const { email, password } = parseBody(loginSchema, req.body);
-    const user = await withTx(db => db.get<LoginUser>('SELECT * FROM auth_find_user_by_email(?)', [email]));
+  app.post(
+    '/api/auth/login',
+    requireSameOrigin(appOrigin),
+    ...loginLimiters(loginRateLimit),
+    async (req: Request, res: Response) => {
+      const { email, password } = parseBody(loginSchema, req.body);
+      const user = await withTx(db => db.get<LoginUser>('SELECT * FROM auth_find_user_by_email(?)', [email]));
 
-    let passwordOk = false;
-    if (user) passwordOk = await verifyPassword(user.password_hash, password);
-    else await burnPasswordCheck(password);
+      let passwordOk = false;
+      if (user) passwordOk = await verifyPassword(user.password_hash, password);
+      else await burnPasswordCheck(password);
 
-    if (!user || !passwordOk || !user.is_active) {
-      const reason = !user ? 'unknown_email' : !passwordOk ? 'wrong_password' : 'inactive';
-      await logEvent(user?.id ?? null, 'auth.login_failed', req, { email, reason });
-      throw new AppError('unauthenticated', 'auth.invalidCredentials');
+      if (!user || !passwordOk || !user.is_active) {
+        const reason = !user ? 'unknown_email' : !passwordOk ? 'wrong_password' : 'inactive';
+        await logEvent(user?.id ?? null, 'auth.login_failed', req, { email, reason });
+        throw new AppError('unauthenticated', 'auth.invalidCredentials');
+      }
+      if (user.must_change_password && user.password_expires_at && user.password_expires_at <= new Date()) {
+        await logEvent(user.id, 'auth.login_failed', req, { email, reason: 'temporary_password_expired' });
+        throw new AppError('unauthenticated', 'auth.temporaryPasswordExpired');
+      }
+
+      const previousToken = readCookie(req, SESSION_COOKIE);
+      const token = newToken();
+      const tokenHash = hashToken(token);
+      await withTx(async db => {
+        if (previousToken) await db.query('SELECT auth_revoke_session(?)', [hashToken(previousToken)]);
+        await db.query('SELECT auth_create_session(?, ?, ?, ?, ?)', [
+          user.id,
+          tokenHash,
+          newToken(),
+          req.ip ?? null,
+          req.get('user-agent')?.slice(0, 512) ?? null
+        ]);
+      });
+      await logEvent(user.id, 'auth.login', req);
+
+      const ctx = await loadSession(withTx, tokenHash, req, res);
+      if (!ctx) throw new AppError('internal');
+      req.ctx = ctx;
+      setSessionCookie(res, token);
+      res.json({ success: true, data: await profile(req, ctx) });
     }
-    if (user.must_change_password && user.password_expires_at && user.password_expires_at <= new Date()) {
-      await logEvent(user.id, 'auth.login_failed', req, { email, reason: 'temporary_password_expired' });
-      throw new AppError('unauthenticated', 'auth.temporaryPasswordExpired');
-    }
-
-    const previousToken = readCookie(req, SESSION_COOKIE);
-    const token = newToken();
-    const tokenHash = hashToken(token);
-    await withTx(async db => {
-      if (previousToken) await db.query('SELECT auth_revoke_session(?)', [hashToken(previousToken)]);
-      await db.query('SELECT auth_create_session(?, ?, ?, ?, ?)', [
-        user.id,
-        tokenHash,
-        newToken(),
-        req.ip ?? null,
-        req.get('user-agent')?.slice(0, 512) ?? null
-      ]);
-    });
-    await logEvent(user.id, 'auth.login', req);
-
-    const ctx = await loadSession(withTx, tokenHash, req, res);
-    if (!ctx) throw new AppError('internal');
-    req.ctx = ctx;
-    setSessionCookie(res, token);
-    res.json({ success: true, data: await profile(req, ctx) });
-  });
+  );
 
   app.post('/api/auth/logout', requireAuth, csrfProtection, async (req: Request, res: Response) => {
     const ctx = ctxOf(req);

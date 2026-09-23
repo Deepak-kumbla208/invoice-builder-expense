@@ -1,6 +1,6 @@
 import type { Server } from 'http';
 import type { AddressInfo } from 'net';
-import { createApp } from '../../webserver/app';
+import { createApp, type AppOptions } from '../../webserver/app';
 import { createServerDeps } from '../../webserver/deps';
 import type { PgTestDb } from './pgTestDb';
 
@@ -28,8 +28,8 @@ export type TestServer = {
 export const sessionCookieOf = (setCookie: string[]) =>
   setCookie.find(cookie => cookie.startsWith('__Host-sid='))?.split(';')[0];
 
-export const startTestServer = async (testDb: PgTestDb): Promise<TestServer> => {
-  const app = createApp(createServerDeps(testDb.rolePool('app_user')), { appOrigin: TEST_ORIGIN });
+export const startTestServer = async (testDb: PgTestDb, options: AppOptions = {}): Promise<TestServer> => {
+  const app = createApp(createServerDeps(testDb.rolePool('app_user')), { appOrigin: TEST_ORIGIN, ...options });
   const server = await new Promise<Server>(resolve => {
     const listening = app.listen(0, '127.0.0.1', () => resolve(listening));
   });
