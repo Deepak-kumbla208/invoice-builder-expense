@@ -2,7 +2,7 @@ import type { Response } from '../../shared/types/response';
 import type { Bank } from '../types/bank';
 import type { Business } from '../types/business';
 import type { EntityWithCounts } from '../types/entityWithCounts';
-import type { Invoice, InvoiceBankSnapshots, InvoiceBusinessSnapshots, InvoiceCustomization } from '../types/invoice';
+import type { InvoiceBankSnapshots, InvoiceBusinessSnapshots, InvoiceCustomization } from '../types/invoice';
 import type { Preset } from '../types/preset';
 
 import type { StyleProfile } from '../types/styleProfiles';
@@ -178,11 +178,6 @@ export const decodeInvoiceCustomizationImport = (invoiceC: InvoiceCustomization)
   watermarkFileData: invoiceC.watermarkFileData ? fromBase64(invoiceC.watermarkFileData) : null
 });
 
-export const decodeInvoiceImport = (invoice: Invoice) => ({
-  ...invoice,
-  signatureData: invoice.signatureData ? fromBase64(invoice.signatureData) : null
-});
-
 export const encodeInvoice = <T extends Record<string, unknown>>(invoice?: T | null) => {
   if (!invoice) return invoice;
   return {
@@ -221,14 +216,6 @@ export const encodeInvoiceCustomizationExport = (invoiceC?: InvoiceCustomization
       ? (invoiceC.paidWatermarkFileData as Buffer).toString('base64')
       : null,
     watermarkFileData: invoiceC.watermarkFileData ? (invoiceC.watermarkFileData as Buffer).toString('base64') : null
-  };
-};
-
-export const encodeInvoiceExport = (invoice?: Invoice | null) => {
-  if (!invoice) return invoice;
-  return {
-    ...invoice,
-    signatureData: invoice.signatureData ? (invoice.signatureData as Buffer).toString('base64') : null
   };
 };
 

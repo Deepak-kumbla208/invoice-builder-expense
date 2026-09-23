@@ -63,20 +63,31 @@ Requires Node.js 22+, npm and Docker.
 ```bash
 docker compose -f docker-compose.dev.yml up -d   # postgres :5432, postgres-test :5433
 npm ci
-export DATABASE_URL=postgres://postgres:postgres@localhost:5432/invoice_expense
-npm run migrate                                  # apply migrations
-npm run dev                                      # vite :5173 + API :3000
+export MIGRATION_DATABASE_URL=postgres://app_owner:app_owner@localhost:5432/invoice_expense
+export DATABASE_URL=postgres://app_user:app_user@localhost:5432/invoice_expense
+npm run migrate                                  # apply migrations as app_owner
+npm run dev                                      # vite :5173 + API :3000, as app_user
 ```
+
+Both PostgreSQL containers run `db/init/00-roles.sql` on first start, which creates `app_owner`
+(owns the schema, runs migrations) and `app_user` (the API's login, subject to row-level security).
+The script only runs against an empty data directory: for a volume created before it existed, run
+`docker compose -f docker-compose.dev.yml down -v` first.
 
 | Command             | What it does                                       |
 | ------------------- | -------------------------------------------------- |
 | `npm run dev`       | Vite dev server and the API, together              |
 | `npm run migrate`   | Apply pending SQL migrations                       |
+| `npm run admin`     | Admin CLI (`-- create-super-admin`)                |
 | `npm run lint`      | ESLint over the whole repo                         |
 | `npm run typecheck` | TypeScript, renderer and server                    |
 | `npm test`          | Unit and integration tests (needs `postgres-test`) |
 | `npm run test:e2e`  | Playwright end-to-end tests                        |
 | `npm run build`     | Production `dist-fe` and `dist-be`                 |
+
+The e2e specs sign in as a Super Admin they create with the admin CLI, so they need
+`E2E_MIGRATION_DATABASE_URL` (an `app_owner` URL for the database the API uses); without it they are skipped.
+The invoice regression spec expects an empty invoice list.
 
 ## 🐳 Running the stack
 
@@ -85,9 +96,14 @@ npm run dev                                      # vite :5173 + API :3000
 `/api/*` to the API. Only Caddy publishes ports (80 and 443).
 
 ```bash
-cp .env.example .env     # set APP_DOMAIN and POSTGRES_PASSWORD
+cp .env.example .env     # set APP_DOMAIN and the passwords
 docker compose up -d --build
+docker compose run --rm admin-cli create-super-admin   # first run only
 ```
+
+There are no built-in users. `create-super-admin` asks for an email, a name and a password (at
+least 12 characters) and creates a Super Admin who can see every company and office. In
+development, run `npm run admin -- create-super-admin` with `MIGRATION_DATABASE_URL` set.
 
 With `APP_DOMAIN=localhost` Caddy issues a certificate from its own internal CA, so
 `https://localhost` works immediately; the browser warns about the CA unless you trust it. For a
@@ -101,12 +117,15 @@ successfully. To apply migrations without restarting the API, run `docker compos
 
 | Variable                 | Used by   | Meaning                                                                          |
 | ------------------------ | --------- | -------------------------------------------------------------------------------- |
-| `DATABASE_URL`           | API       | PostgreSQL connection string for the application user                            |
-| `MIGRATION_DATABASE_URL` | `migrate` | Connection string for migrations; falls back to `DATABASE_URL`                   |
+| `DATABASE_URL`           | API       | PostgreSQL connection string, as `app_user`                                      |
+| `MIGRATION_DATABASE_URL` | `migrate` | Connection string for migrations, as `app_owner`; falls back to `DATABASE_URL`   |
+| `APP_ORIGIN`             | API       | Origin the login request must come from; defaults to the request's own origin    |
 | `HOST`                   | API       | Bind address (default `127.0.0.1`; the image sets `0.0.0.0`)                     |
 | `PORT`                   | API       | API port (default `3000`)                                                        |
 | `APP_DOMAIN`             | Caddy     | Hostname Caddy serves and requests a certificate for                             |
 | `POSTGRES_PASSWORD`      | `db`      | Password for the PostgreSQL superuser inside the container                       |
+| `APP_OWNER_PASSWORD`     | `db`      | Password `00-roles.sql` sets for `app_owner`                                     |
+| `APP_USER_PASSWORD`      | `db`      | Password `00-roles.sql` sets for `app_user`                                      |
 | `TEST_DATABASE_URL`      | tests     | Test PostgreSQL (default `postgres://postgres:postgres@localhost:5433/postgres`) |
 | `API_PROXY_TARGET`       | dev only  | Where the Vite dev server proxies `/api/*` (default `http://127.0.0.1:3000`)     |
 | `VITE_API_URL`           | renderer  | API origin, for split-origin deployments; defaults to the page origin            |

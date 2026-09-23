@@ -84,4 +84,24 @@ export const createWithTx =
     }
   };
 
+export type WithTx = ReturnType<typeof createWithTx>;
+
+export type DbCtx = { userId: number; officeIds: number[]; businessIds: number[]; allOffices: boolean };
+
+export const createWithRequestTx = (dbPool: Pool) => {
+  const withDbTx = createWithTx(dbPool);
+  return <T>(ctx: DbCtx, fn: (db: Db) => Promise<T>): Promise<T> =>
+    withDbTx(async db => {
+      await db.query(
+        `SELECT set_config('app.user_id', ?, true), set_config('app.office_ids', ?, true),
+                set_config('app.business_ids', ?, true), set_config('app.all_offices', ?, true)`,
+        [String(ctx.userId), ctx.officeIds.join(','), ctx.businessIds.join(','), String(ctx.allOffices)]
+      );
+      return fn(db);
+    });
+};
+
+export type WithRequestTx = ReturnType<typeof createWithRequestTx>;
+
 export const withTx = createWithTx(pool);
+export const withRequestTx = createWithRequestTx(pool);

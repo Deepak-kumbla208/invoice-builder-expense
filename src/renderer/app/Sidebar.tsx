@@ -1,244 +1,145 @@
+import { ChevronLeft, ChevronRight, ExpandLess, ExpandMore } from '@mui/icons-material';
+import KeyIcon from '@mui/icons-material/Key';
+import LogoutIcon from '@mui/icons-material/Logout';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
 import {
-  Business,
-  ChevronLeft,
-  ChevronRight,
-  Description,
-  Folder,
-  Inventory,
-  People,
-  Settings,
-  TableChart
-} from '@mui/icons-material';
-import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
-import AccountTreeIcon from '@mui/icons-material/AccountTree';
-import AssessmentIcon from '@mui/icons-material/Assessment';
-import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
-import CategoryIcon from '@mui/icons-material/Category';
-import ColorLensIcon from '@mui/icons-material/ColorLens';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import ReceiptIcon from '@mui/icons-material/Receipt';
-import ScaleIcon from '@mui/icons-material/Scale';
-import ViewModule from '@mui/icons-material/ViewModule';
-import { Box, Divider, Drawer, IconButton, Tooltip, Typography } from '@mui/material';
+  Avatar,
+  Box,
+  Collapse,
+  Divider,
+  Drawer,
+  IconButton,
+  List,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Menu,
+  MenuItem,
+  Tooltip,
+  Typography
+} from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
-import { useCallback, useEffect, useState, type FC } from 'react';
+import { useCallback, useEffect, useMemo, useState, type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getApi } from '../shared/api/restApi';
-import { MenuList } from '../shared/components/lists/menuList/MenuList';
-import type { MenuItem } from '../shared/types/menuItem';
+import { useLogout } from '../shared/hooks/auth/useAuthActions';
+import { withReturnTo } from '../shared/utils/authFunctions';
 import { useAppDispatch, useAppSelector } from '../state/configureStore';
+import { selectAuthUser, selectPermissionSet } from '../state/authSlice';
 import { selectSettings, selectVersion, setVersion } from '../state/pageSlice';
-const DRAWER_WIDTH = 240;
+import { NAV_CONFIG, filterNav, isNavGroup, navLeaves, type NavEntry, type NavLeaf } from './navConfig';
+
+const DRAWER_WIDTH = 260;
 const COLLAPSED_WIDTH = 60;
+
+const isActivePath = (path: string, pathname: string) =>
+  path === '/' ? pathname === '/' : pathname === path || pathname.startsWith(`${path}/`);
+
+const containsPath = (entry: NavEntry, pathname: string) =>
+  navLeaves([entry]).some(leaf => isActivePath(leaf.path, pathname));
 
 export const Sidebar: FC = () => {
   const dispatch = useAppDispatch();
-
   const theme = useTheme();
-  const [open, setOpen] = useState(true);
-
-  const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
-  const storeSettings = useAppSelector(selectSettings);
+  const logout = useLogout();
+  const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
+  const [open, setOpen] = useState(true);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ invoices: true });
+  const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
+  const settings = useAppSelector(selectSettings);
+  const granted = useAppSelector(selectPermissionSet);
+  const user = useAppSelector(selectAuthUser);
   const version = useAppSelector(selectVersion);
 
-  const onClickNavigate = useCallback(
-    (item: MenuItem) => {
-      if (typeof item.path !== 'undefined') {
-        navigate(item.path);
-      }
-    },
-    [navigate]
+  const entries = useMemo(() => filterNav(NAV_CONFIG, granted, settings), [granted, settings]);
+
+  const isGroupOpen = useCallback(
+    (entry: NavEntry) => openGroups[entry.id] ?? containsPath(entry, location.pathname),
+    [openGroups, location.pathname]
   );
 
-  const isSelected = useCallback(
-    (item: MenuItem) => {
-      return location.pathname === item.path;
-    },
-    [location]
-  );
+  const toggleGroup = (entry: NavEntry) => setOpenGroups(prev => ({ ...prev, [entry.id]: !isGroupOpen(entry) }));
 
-  const menuItems = [
-    {
-      groupName: t('common.documents'),
-      groupIcon: <Folder />,
-      isOpen: true,
-      items: [
-        {
-          text: t('menuItems.invoices'),
-          icon: <Description />,
-          path: '/invoices',
-          isToggle: false,
-          minHeight: 50,
-          isSelected: isSelected,
-          onClick: onClickNavigate
-        },
-        ...(storeSettings?.quotesON
-          ? [
-              {
-                text: t('menuItems.quotes'),
-                icon: <ReceiptIcon />,
-                path: '/quotes',
-                isToggle: false,
-                minHeight: 50,
-                isSelected: isSelected,
-                onClick: onClickNavigate
-              }
-            ]
-          : [])
-      ]
-    },
+  const renderLeaf = (leaf: NavLeaf, depth: number, labelKey = leaf.labelKey, Icon = leaf.icon) => {
+    const label = t(labelKey);
+    const button = (
+      <ListItemButton
+        key={leaf.id}
+        selected={isActivePath(leaf.path, location.pathname)}
+        onClick={() => navigate(leaf.path)}
+        sx={{ minHeight: 44, pl: open ? 2 + depth * 2 : 2.5 }}
+      >
+        <ListItemIcon sx={{ color: 'text.primary', minWidth: open ? 40 : 0 }}>
+          <Icon fontSize="small" />
+        </ListItemIcon>
+        {open && <ListItemText primary={label} />}
+      </ListItemButton>
+    );
+    return open ? (
+      button
+    ) : (
+      <Tooltip key={leaf.id} title={label} placement="right">
+        {button}
+      </Tooltip>
+    );
+  };
 
-    {
-      groupName: t('common.templates'),
-      groupIcon: <ViewModule />,
-      isOpen: true,
-      items: [
-        ...(storeSettings?.presetsON
-          ? [
-              {
-                text: t('menuItems.presets'),
-                icon: <ContentCopyIcon />,
-                path: '/presets',
-                isToggle: false,
-                minHeight: 50,
-                isSelected: isSelected,
-                onClick: onClickNavigate
-              }
-            ]
-          : []),
-        ...(storeSettings?.styleProfilesON
-          ? [
-              {
-                text: t('menuItems.styleProfiles'),
-                icon: <ColorLensIcon />,
-                path: '/styleProfiles',
-                isToggle: false,
-                minHeight: 50,
-                isSelected: isSelected,
-                onClick: onClickNavigate
-              }
-            ]
-          : []),
-        {
-          text: t('common.layouts'),
-          icon: <AccountTreeIcon />,
-          path: '/layouts',
-          isToggle: false,
-          minHeight: 50,
-          isSelected: isSelected,
-          onClick: onClickNavigate
-        }
-      ]
-    },
-    {
-      groupName: t('common.data'),
-      groupIcon: <TableChart />,
-      isOpen: false,
-      items: [
-        {
-          text: t('menuItems.banks'),
-          icon: <AccountBalanceIcon />,
-          path: '/banks',
-          isToggle: false,
-          minHeight: 50,
-          isSelected: isSelected,
-          onClick: onClickNavigate
-        },
-        {
-          text: t('menuItems.items'),
-          icon: <Inventory />,
-          path: '/items',
-          isToggle: false,
-          minHeight: 50,
-          isSelected: isSelected,
-          onClick: onClickNavigate
-        },
-        {
-          text: t('menuItems.currencies'),
-          icon: <AttachMoneyIcon />,
-          path: '/currencies',
-          isToggle: false,
-          minHeight: 50,
-          isSelected: isSelected,
-          onClick: onClickNavigate
-        },
-        {
-          text: t('menuItems.units'),
-          icon: <ScaleIcon />,
-          path: '/units',
-          isToggle: false,
-          minHeight: 50,
-          isSelected: isSelected,
-          onClick: onClickNavigate
-        },
-        {
-          text: t('menuItems.categories'),
-          icon: <CategoryIcon />,
-          path: '/categories',
-          isToggle: false,
-          minHeight: 50,
-          isSelected: isSelected,
-          onClick: onClickNavigate
-        },
-        {
-          text: t('menuItems.clients'),
-          icon: <People />,
-          path: '/clients',
-          isToggle: false,
-          minHeight: 50,
-          isSelected: isSelected,
-          onClick: onClickNavigate
-        },
-        {
-          text: t('menuItems.businesses'),
-          icon: <Business />,
-          path: '/businesses',
-          isToggle: false,
-          minHeight: 50,
-          isSelected: isSelected,
-          onClick: onClickNavigate
-        }
-      ]
-    },
-    {
-      items: [
-        ...(storeSettings?.reportsON
-          ? [
-              {
-                text: t('menuItems.reports'),
-                icon: <AssessmentIcon />,
-                path: '/reports',
-                isToggle: false,
-                minHeight: 50,
-                isSelected: isSelected,
-                onClick: onClickNavigate
-              }
-            ]
-          : []),
-        {
-          text: t('menuItems.settings'),
-          icon: <Settings />,
-          path: '/settings',
-          isToggle: false,
-          minHeight: 50,
-          isSelected: isSelected,
-          onClick: onClickNavigate
-        }
-      ]
+  const renderEntry = (entry: NavEntry, depth = 0) => {
+    if (!isNavGroup(entry)) return renderLeaf(entry, depth);
+
+    const [onlyChild] = entry.children;
+    if (entry.children.length === 1 && !isNavGroup(onlyChild)) {
+      return renderLeaf(onlyChild, depth, entry.labelKey, entry.icon);
     }
-  ];
 
-  const handleToggle = () => setOpen(!open);
+    const expanded = isGroupOpen(entry);
+    const label = t(entry.labelKey);
+    const button = (
+      <ListItemButton onClick={() => toggleGroup(entry)} sx={{ minHeight: 44, pl: open ? 2 + depth * 2 : 2.5 }}>
+        <ListItemIcon sx={{ color: 'text.primary', minWidth: open ? 40 : 0 }}>
+          <entry.icon fontSize="small" />
+        </ListItemIcon>
+        {open && <ListItemText primary={label} />}
+        {open && (expanded ? <ExpandLess /> : <ExpandMore />)}
+      </ListItemButton>
+    );
+
+    return (
+      <Box key={entry.id}>
+        {open ? (
+          button
+        ) : (
+          <Tooltip title={label} placement="right">
+            {button}
+          </Tooltip>
+        )}
+        <Collapse in={expanded} timeout="auto" unmountOnExit>
+          <List component="div" disablePadding>
+            {entry.children.map(child => renderEntry(child, depth + 1))}
+          </List>
+          {!open && <Divider sx={{ my: 0.5 }} />}
+        </Collapse>
+      </Box>
+    );
+  };
+
+  const onChangePassword = () => {
+    setMenuAnchor(null);
+    navigate(withReturnTo('/change-password', `${location.pathname}${location.search}`));
+  };
+
+  const onLogout = () => {
+    setMenuAnchor(null);
+    logout();
+  };
 
   useEffect(() => {
-    if (!isDesktop) {
-      setOpen(false);
-    }
+    if (!isDesktop) setOpen(false);
   }, [isDesktop]);
 
   useEffect(() => {
@@ -247,14 +148,19 @@ export const Sidebar: FC = () => {
       .then(v => dispatch(setVersion(v)));
   }, [dispatch]);
 
+  const initials = (user?.fullName ?? '?')
+    .split(/\s+/)
+    .map(part => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
   return (
     <Drawer
       variant="permanent"
       sx={{
         width: open ? DRAWER_WIDTH : COLLAPSED_WIDTH,
         flexShrink: 0,
-        display: 'flex',
-        flexDirection: 'column',
         '& .MuiDrawer-paper': {
           width: open ? DRAWER_WIDTH : COLLAPSED_WIDTH,
           boxSizing: 'border-box',
@@ -279,22 +185,13 @@ export const Sidebar: FC = () => {
             minHeight: 64
           }}
         >
-          <Box sx={{ flexGrow: 1 }}></Box>
           {open && (
-            <Typography
-              variant="h6"
-              noWrap
-              component="div"
-              sx={{
-                color: theme.palette.primary.main
-              }}
-            >
-              {t(`app.title`)}
+            <Typography variant="h6" noWrap component="div" sx={{ pl: 1, color: theme.palette.primary.main }}>
+              {t('app.title')}
             </Typography>
           )}
-          <Box sx={{ flexGrow: 1 }}></Box>
           <Tooltip title={t('ariaLabel.menu')}>
-            <IconButton onClick={handleToggle} aria-label={t('ariaLabel.menu')}>
+            <IconButton onClick={() => setOpen(!open)} aria-label={t('ariaLabel.menu')}>
               {open ? <ChevronLeft /> : <ChevronRight />}
             </IconButton>
           </Tooltip>
@@ -303,16 +200,64 @@ export const Sidebar: FC = () => {
 
       {isDesktop && <Divider />}
 
-      <MenuList useTooltip={true} items={menuItems} showText={open} />
+      <List component="nav" aria-label={t('ariaLabel.menu')} sx={{ flexGrow: 1, overflowY: 'auto' }}>
+        {entries.map(entry => renderEntry(entry))}
+      </List>
 
-      <Box sx={{ p: 2 }}>
-        <Divider />
+      <Divider />
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1, justifyContent: open ? 'flex-start' : 'center' }}>
         {open && (
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: 'center', whiteSpace: 'nowrap' }}>
-            {t(`app.version`)}: {version}
-          </Typography>
+          <>
+            <Avatar sx={{ width: 32, height: 32, fontSize: 14, bgcolor: 'primary.main' }}>{initials}</Avatar>
+            <Box sx={{ minWidth: 0, flexGrow: 1 }}>
+              <Typography variant="body2" noWrap>
+                {user?.fullName}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" noWrap component="div">
+                {user?.roleName}
+              </Typography>
+            </Box>
+          </>
         )}
+        <Tooltip title={t('auth.accountMenu')}>
+          <IconButton
+            aria-label={t('auth.accountMenu')}
+            aria-haspopup="menu"
+            onClick={event => setMenuAnchor(event.currentTarget)}
+          >
+            {open ? <MoreVertIcon /> : <Avatar sx={{ width: 28, height: 28, fontSize: 12 }}>{initials}</Avatar>}
+          </IconButton>
+        </Tooltip>
+        <Menu
+          anchorEl={menuAnchor}
+          open={Boolean(menuAnchor)}
+          onClose={() => setMenuAnchor(null)}
+          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+          transformOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        >
+          <MenuItem disabled>
+            <ListItemText primary={user?.fullName} secondary={user?.email} />
+          </MenuItem>
+          <Divider />
+          <MenuItem onClick={onChangePassword}>
+            <ListItemIcon>
+              <KeyIcon fontSize="small" />
+            </ListItemIcon>
+            {t('auth.changePassword')}
+          </MenuItem>
+          <MenuItem onClick={onLogout}>
+            <ListItemIcon>
+              <LogoutIcon fontSize="small" />
+            </ListItemIcon>
+            {t('auth.signOut')}
+          </MenuItem>
+        </Menu>
       </Box>
+      {open && (
+        <Typography variant="caption" color="text.secondary" sx={{ pb: 1, textAlign: 'center', whiteSpace: 'nowrap' }}>
+          {t('app.version')}: {version}
+        </Typography>
+      )}
     </Drawer>
   );
 };

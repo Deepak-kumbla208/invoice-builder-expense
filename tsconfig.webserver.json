@@ -11,6 +11,6 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/backend/webserver/**/*.ts", "src/backend/shared/**/*.ts"],
+  "include": ["src/backend/webserver/**/*.ts", "src/backend/shared/**/*.ts", "src/backend/admin-cli/**/*.ts"],
   "exclude": ["node_modules"]
 }

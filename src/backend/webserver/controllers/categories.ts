@@ -1,28 +1,29 @@
 import { type Express, type Request, type Response } from 'express';
-import { withTx } from '../../shared/db/tx';
+import type { ServerDeps } from '../deps';
+import { canManageInvoiceSetup, canReadInvoiceSetup } from './access';
 import * as categoriesService from '../../shared/services/categories';
 import { parseFilter } from '../utils/functions';
 
-export const initCategoriesController = (app: Express) => {
-  app.get('/api/categories', async (req: Request, res: Response) => {
+export const initCategoriesController = (app: Express, { requestTx }: ServerDeps) => {
+  app.get('/api/categories', canReadInvoiceSetup, async (req: Request, res: Response) => {
     const filter = parseFilter(req.query.filter as string);
-    const result = await withTx(db => categoriesService.getAllCategories(db, filter));
+    const result = await requestTx(req, db => categoriesService.getAllCategories(db, filter));
     res.json(result);
   });
-  app.post('/api/categories', async (req: Request, res: Response) => {
-    const result = await withTx(db => categoriesService.addCategory(db, req.body));
+  app.post('/api/categories', canManageInvoiceSetup, async (req: Request, res: Response) => {
+    const result = await requestTx(req, db => categoriesService.addCategory(db, req.body));
     res.json(result);
   });
-  app.put('/api/categories', async (req: Request, res: Response) => {
-    const result = await withTx(db => categoriesService.updateCategory(db, req.body));
+  app.put('/api/categories', canManageInvoiceSetup, async (req: Request, res: Response) => {
+    const result = await requestTx(req, db => categoriesService.updateCategory(db, req.body));
     res.json(result);
   });
-  app.delete('/api/categories/:id', async (req: Request, res: Response) => {
-    const result = await withTx(db => categoriesService.deleteCategory(db, Number(req.params.id)));
+  app.delete('/api/categories/:id', canManageInvoiceSetup, async (req: Request, res: Response) => {
+    const result = await requestTx(req, db => categoriesService.deleteCategory(db, Number(req.params.id)));
     res.json(result);
   });
-  app.post('/api/categories/batch', async (req: Request, res: Response) => {
-    const result = await withTx(db => categoriesService.batchAddCategory(db, req.body));
+  app.post('/api/categories/batch', canManageInvoiceSetup, async (req: Request, res: Response) => {
+    const result = await requestTx(req, db => categoriesService.batchAddCategory(db, req.body));
     res.json(result);
   });
 };

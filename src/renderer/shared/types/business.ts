@@ -2,6 +2,8 @@ export interface BusinessMeta {
   id: number;
   name: string;
   shortName: string;
+  legal_name?: string | null;
+  pan?: string | null;
   address?: string;
   role?: string;
   email?: string;
@@ -37,6 +39,8 @@ export interface BusinessWeb extends BusinessMeta {
 export interface BusinessAddMeta {
   name: string;
   shortName: string;
+  legal_name?: string | null;
+  pan?: string | null;
   address?: string;
   role?: string;
   email?: string;
@@ -80,6 +84,8 @@ export interface BusinessFromData {
   phone?: string;
   name: string;
   shortName: string;
+  legal_name?: string | null;
+  pan?: string | null;
   role?: string;
   address?: string;
   website?: string;

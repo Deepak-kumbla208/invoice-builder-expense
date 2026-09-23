@@ -1,3 +1,4 @@
+import { PAN_PATTERN } from '@shared/constants/gstStates';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { Box, FormControlLabel, Grid, Switch, TextField, Tooltip } from '@mui/material';
 import { useEffect, useRef, useState, type FC } from 'react';
@@ -26,6 +27,8 @@ export const Form: FC<Props> = ({ handleChange = () => {}, business }) => {
     phone: business?.phone ?? '',
     name: business?.name ?? '',
     shortName: business?.shortName ?? '',
+    legal_name: business?.legal_name ?? '',
+    pan: business?.pan ?? '',
     role: business?.role ?? '',
     address: business?.address ?? '',
     website: business?.website ?? '',
@@ -49,6 +52,7 @@ export const Form: FC<Props> = ({ handleChange = () => {}, business }) => {
     phone: false,
     name: false,
     shortName: false,
+    pan: false,
     peppolEndpointSchemeId: false,
     peppolEndpointId: false,
     countryCode: false
@@ -74,6 +78,8 @@ export const Form: FC<Props> = ({ handleChange = () => {}, business }) => {
   const validateField = (field: keyof typeof errors, value: string) => {
     if (!validators.required(value) && (field === 'name' || field === 'shortName')) {
       setErrors(e => ({ ...e, [field]: true }));
+    } else if (field === 'pan') {
+      setErrors(e => ({ ...e, pan: value !== '' && !PAN_PATTERN.test(value) }));
     } else if (field === 'email') {
       setErrors(e => ({ ...e, email: value !== '' && !validators.email(value) }));
     } else if (field === 'peppolEndpointSchemeId') {
@@ -99,6 +105,8 @@ export const Form: FC<Props> = ({ handleChange = () => {}, business }) => {
       phone: business?.phone ?? '',
       name: business?.name ?? '',
       shortName: business?.shortName ?? '',
+      legal_name: business?.legal_name ?? '',
+      pan: business?.pan ?? '',
       role: business?.role ?? '',
       address: business?.address ?? '',
       website: business?.website ?? '',
@@ -133,6 +141,7 @@ export const Form: FC<Props> = ({ handleChange = () => {}, business }) => {
       !errors.phone &&
       !errors.name &&
       !errors.shortName &&
+      !errors.pan &&
       !errors.countryCode &&
       !errors.peppolEndpointId &&
       !errors.peppolEndpointSchemeId;
@@ -180,6 +189,29 @@ export const Form: FC<Props> = ({ handleChange = () => {}, business }) => {
               maxLength: 2
             }
           }}
+        />
+      </Grid>
+      <Grid size={{ xs: 12, md: 6 }}>
+        <TextField
+          label={t('businesses.legalName')}
+          fullWidth
+          value={form.legal_name}
+          onChange={e => update('legal_name', e.target.value)}
+          slotProps={{ htmlInput: { maxLength: 300 } }}
+        />
+      </Grid>
+      <Grid size={{ xs: 12, md: 6 }}>
+        <TextField
+          label={t('businesses.pan')}
+          fullWidth
+          value={form.pan}
+          error={errors.pan}
+          helperText={errors.pan ? t('company.panInvalid') : t('businesses.panHelper')}
+          onChange={e => {
+            update('pan', e.target.value.toUpperCase());
+            validateField('pan', e.target.value.toUpperCase());
+          }}
+          slotProps={{ htmlInput: { maxLength: 10 } }}
         />
       </Grid>
       <Grid size={{ xs: 12, md: 6 }}>

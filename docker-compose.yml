@@ -8,8 +8,11 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       POSTGRES_DB: invoice_expense
+      APP_OWNER_PASSWORD: ${APP_OWNER_PASSWORD:?APP_OWNER_PASSWORD is required}
+      APP_USER_PASSWORD: ${APP_USER_PASSWORD:?APP_USER_PASSWORD is required}
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
     networks:
       - internal
     healthcheck:
@@ -33,12 +36,32 @@ services:
       - internal
     restart: 'no'
 
+  # First run: docker compose run --rm admin-cli create-super-admin
+  admin-cli:
+    build:
+      context: .
+      target: runner
+    entrypoint: ['node', 'dist-be/backend/server/admin-cli/index.js']
+    environment:
+      MIGRATION_DATABASE_URL: ${MIGRATION_DATABASE_URL:?MIGRATION_DATABASE_URL is required}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - internal
+    stdin_open: true
+    tty: true
+    profiles:
+      - tools
+    restart: 'no'
+
   app:
     build:
       context: .
       target: runner
     environment:
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      APP_ORIGIN: https://${APP_DOMAIN:?APP_DOMAIN is required}
       HOST: 0.0.0.0
       PORT: 3000
     depends_on:

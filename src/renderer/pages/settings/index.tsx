@@ -4,18 +4,12 @@ import { useTranslation } from 'react-i18next';
 import i18n from '../../i18n';
 import { Content } from '../../shared/components/layout/content/Content';
 import { NoItem } from '../../shared/components/lists/noItem/NoItem';
-import { Confirmation } from '../../shared/components/modals/confirmation';
 import type { AmountFormat } from '../../shared/enums/amountFormat';
 import type { DateFormat } from '../../shared/enums/dateFormat';
 import type { Language } from '../../shared/enums/language';
 import { MenuItemSettings } from '../../shared/enums/menuItemSettings';
-import { useExportJson } from '../../shared/hooks/backup/useExportJson';
-import { useImportJson } from '../../shared/hooks/backup/useImportJson';
-import { useSettingsRetrieve } from '../../shared/hooks/settings/useSettingsRetrieve';
 import { useSettingsUpdate } from '../../shared/hooks/settings/useSettingsUpdate';
-import type { ExportMeta } from '../../shared/types/exportMeta';
 import type { Response } from '../../shared/types/response';
-import type { Settings } from '../../shared/types/settings';
 import { useAppDispatch, useAppSelector } from '../../state/configureStore';
 import {
   addToast,
@@ -43,19 +37,6 @@ export const SettingsPage = () => {
   const storeSettings = useAppSelector(selectSettings);
   const hasInitialized = useRef(false);
   const stableSettings = useMemo(() => storeSettings ?? {}, [storeSettings]);
-  const [showImportConfirm, setShowImportConfirm] = useState(false);
-
-  const { execute: getSettings } = useSettingsRetrieve({
-    immediate: false,
-    onDone: (data: Response<Settings>) => {
-      if (!data.success) {
-        if (data.message) {
-          const message = i18n.exists(data.message) ? t(data.message) : data.message;
-          dispatch(addToast({ message: message, severity: 'error' }));
-        } else if (data.key) dispatch(addToast({ message: t(data.key), severity: 'error' }));
-      }
-    }
-  });
 
   const { execute } = useSettingsUpdate({
     newSettings: stableSettings ?? {},
@@ -66,41 +47,6 @@ export const SettingsPage = () => {
           const message = i18n.exists(data.message) ? t(data.message) : data.message;
           dispatch(addToast({ message: message, severity: 'error' }));
         } else if (data.key) dispatch(addToast({ message: t(data.key), severity: 'error' }));
-      }
-    }
-  });
-
-  const { execute: exportJSONBackup } = useExportJson({
-    immediate: false,
-    onDone: (data: Response<ExportMeta>) => {
-      if (!data.success) {
-        if (data.message) {
-          const message = i18n.exists(data.message) ? t(data.message) : data.message;
-          dispatch(addToast({ message: message, severity: 'error' }));
-        } else if (data.key) dispatch(addToast({ message: t(data.key), severity: 'error' }));
-      } else if (data?.success) {
-        const path = data.data?.filePath;
-        dispatch(
-          addToast({
-            message: path ? t('common.exportedTo', { path: path }) : t('common.exported'),
-            severity: 'success'
-          })
-        );
-      }
-    }
-  });
-
-  const { execute: importJSON } = useImportJson({
-    immediate: false,
-    onDone: (data: Response<unknown>) => {
-      if (!data.success) {
-        if (data.message) {
-          const message = i18n.exists(data.message) ? t(data.message) : data.message;
-          dispatch(addToast({ message: message, severity: 'error' }));
-        } else if (data.key) dispatch(addToast({ message: t(data.key), severity: 'error' }));
-      } else {
-        dispatch(addToast({ message: t('common.imported'), severity: 'success' }));
-        getSettings();
       }
     }
   });
@@ -153,23 +99,6 @@ export const SettingsPage = () => {
     },
     [dispatch]
   );
-
-  const exportJSON = useCallback(() => {
-    exportJSONBackup();
-  }, [exportJSONBackup]);
-
-  const importJSONCallback = useCallback(() => {
-    setShowImportConfirm(true);
-  }, []);
-
-  const handleCancelImport = useCallback(() => {
-    setShowImportConfirm(false);
-  }, []);
-
-  const handleConfirmImport = useCallback(() => {
-    handleCancelImport();
-    importJSON();
-  }, [handleCancelImport, importJSON]);
 
   const onCustomizedInvoice = useCallback(
     (data: {
@@ -255,8 +184,6 @@ export const SettingsPage = () => {
       togglePresets={togglePresets}
       toggleUBL={toggleUBL}
       toggleXRechnung={toggleXRechnung}
-      onExportJSON={exportJSON}
-      onImportJSON={importJSONCallback}
     />
   );
 
@@ -267,12 +194,6 @@ export const SettingsPage = () => {
       spacing={2}
       sx={{ height: '100%', justifyContent: 'center', alignItems: 'stretch' }}
     >
-      <Confirmation
-        onCancel={handleCancelImport}
-        onConfirm={handleConfirmImport}
-        isOpen={showImportConfirm}
-        text={t('settingsMenuItems.importConfirmText')}
-      />
       {isDesktop ? (
         <>
           {leftColumnMenu}

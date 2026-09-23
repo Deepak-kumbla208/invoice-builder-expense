@@ -27,7 +27,11 @@ const businessFields: (keyof Business)[] = [
   'countryCode',
   'code',
   'peppolEndpointSchemeId',
-  'isArchived'
+  'isArchived',
+  'legal_name',
+  'pan',
+  'default_layout_id',
+  'default_style_profile_id'
 ];
 
 export const getAllBusinesses = (db: Db, filter?: FilterData[]): Promise<Response<(Business & EntityWithCounts)[]>> => {

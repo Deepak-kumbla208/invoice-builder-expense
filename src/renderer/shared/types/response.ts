@@ -3,4 +3,5 @@ export interface Response<T> {
   message?: string;
   data?: T;
   key?: string;
+  errors?: Record<string, string[]>;
 }

@@ -1,28 +1,29 @@
 import { type Express, type Request, type Response } from 'express';
-import { withTx } from '../../shared/db/tx';
+import type { ServerDeps } from '../deps';
+import { requirePermission } from '../middleware/permissions';
 import * as clientsService from '../../shared/services/clients';
 import { parseFilter } from '../utils/functions';
 
-export const initClientsController = (app: Express) => {
-  app.get('/api/clients', async (req: Request, res: Response) => {
+export const initClientsController = (app: Express, { requestTx }: ServerDeps) => {
+  app.get('/api/clients', requirePermission('customer.view'), async (req: Request, res: Response) => {
     const filter = parseFilter(req.query.filter as string);
-    const result = await withTx(db => clientsService.getAllClients(db, filter));
+    const result = await requestTx(req, db => clientsService.getAllClients(db, filter));
     res.json(result);
   });
-  app.post('/api/clients', async (req: Request, res: Response) => {
-    const result = await withTx(db => clientsService.addClient(db, req.body));
+  app.post('/api/clients', requirePermission('customer.manage'), async (req: Request, res: Response) => {
+    const result = await requestTx(req, db => clientsService.addClient(db, req.body));
     res.json(result);
   });
-  app.put('/api/clients', async (req: Request, res: Response) => {
-    const result = await withTx(db => clientsService.updateClient(db, req.body));
+  app.put('/api/clients', requirePermission('customer.manage'), async (req: Request, res: Response) => {
+    const result = await requestTx(req, db => clientsService.updateClient(db, req.body));
     res.json(result);
   });
-  app.delete('/api/clients/:id', async (req: Request, res: Response) => {
-    const result = await withTx(db => clientsService.deleteClient(db, Number(req.params.id)));
+  app.delete('/api/clients/:id', requirePermission('customer.manage'), async (req: Request, res: Response) => {
+    const result = await requestTx(req, db => clientsService.deleteClient(db, Number(req.params.id)));
     res.json(result);
   });
-  app.post('/api/clients/batch', async (req: Request, res: Response) => {
-    const result = await withTx(db => clientsService.batchAddClient(db, req.body));
+  app.post('/api/clients/batch', requirePermission('customer.manage'), async (req: Request, res: Response) => {
+    const result = await requestTx(req, db => clientsService.batchAddClient(db, req.body));
     res.json(result);
   });
 };

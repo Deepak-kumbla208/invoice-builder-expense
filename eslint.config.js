@@ -52,5 +52,29 @@ export default [
         version: 'detect'
       }
     }
+  },
+  {
+    files: [
+      'src/backend/shared/auth/permissions.ts',
+      'src/backend/shared/auth/passwordPolicy.ts',
+      'src/backend/shared/constants/gstStates.ts'
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [{ group: ['*'], message: 'The renderer imports this file through @shared; keep it import-free.' }]
+        }
+      ]
+    }
+  },
+  {
+    files: ['src/backend/webserver/controllers/**/*.ts', 'src/backend/shared/services/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { patterns: [{ group: ['**/db/systemTx'], message: 'Only internal jobs may use withSystemTx.' }] }
+      ]
+    }
   }
 ];

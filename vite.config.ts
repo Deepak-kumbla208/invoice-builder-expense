@@ -46,17 +46,23 @@ export default defineConfig(({ mode }) => {
       globals: true,
       environment: 'jsdom',
       setupFiles: './setupTests.ts',
+      // Argon2 hashing, PostgreSQL round trips and jsdom PDF layout run about a
+      // second each on an idle machine; with one fork per core they lose more
+      // than the 5 s default to contention, so the slow tests need real headroom.
+      testTimeout: 30_000,
+      hookTimeout: 30_000,
       coverage: {
         include: ['src/**'],
         exclude: ['src/**/vite-env.d.ts', 'src/**/main.tsx', 'src/**/reportWebVitals.ts', 'src/**/mocks'],
         reporter: ['text', 'json', 'html']
       },
       exclude: [...configDefaults.exclude, 'node_modules'],
-      include: ['src/**/__tests__/*.{test,spec}.{js,ts,jsx,tsx}']
+      include: ['src/**/__tests__/**/*.{test,spec}.{js,ts,jsx,tsx}']
     },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, 'src'),
+        '@shared': path.resolve(__dirname, 'src/backend/shared'),
         // Absolute aliases for monaco worker entry files: Rolldown's worker
         // bundler fails to resolve bare `monaco-editor/...` specifiers.
         '@monaco-editor-worker/editor': path.resolve(

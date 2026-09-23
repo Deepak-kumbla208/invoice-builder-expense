@@ -35,6 +35,7 @@ interface GenericListProps<T extends { id: number }> {
   getInvoiceCount?: (item: T) => number;
   getQuotesCount?: (item: T) => number;
   getIsArchived?: (item: T) => boolean;
+  archivedLabel?: string;
 }
 export const GenericList = <T extends { id: number }>({
   item,
@@ -50,7 +51,8 @@ export const GenericList = <T extends { id: number }>({
   getInvoiceCount,
   getQuotesCount,
   getAdditional,
-  getIsArchived
+  getIsArchived,
+  archivedLabel
 }: GenericListProps<T>) => {
   const theme = useTheme();
   const { t } = useTranslation();
@@ -109,7 +111,7 @@ export const GenericList = <T extends { id: number }>({
         >
           {isArchived && (
             <Chip
-              label={t('common.archived').toUpperCase()}
+              label={(archivedLabel ?? t('common.archived')).toUpperCase()}
               variant="outlined"
               size="small"
               clickable={false}
