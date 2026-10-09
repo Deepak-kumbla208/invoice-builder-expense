@@ -90,3 +90,71 @@ rather than hard-coding `96` a second time.
     not, they are within a paisa, for the reason above.
 - **Check:** prettier, lint and typecheck clean; `npm test` 25 files, 242 passed and 3 todo;
   `npm run build` green.
+
+## Task 2.3 decisions (invoice scoping migration)
+
+**Named `0006-invoice-scoping.sql`, not `0004`.** The plan predates Phase 1, which already shipped
+`0004-rls-access.sql` and `0005-access-admin.sql`.
+
+**It is the expand half of an expand/contract pair.** The plan has 2.3 drop the legacy tax columns,
+re-key `invoice_sequences`, make the scope columns `NOT NULL` and turn on RLS for `invoices` and
+friends - but nothing populates a scope column until the service rewrite in 2.4. Doing all of that
+here would leave the service, the suite and the app broken at this commit, so 2.3 is additive only
+and the destructive half goes with 2.4, which is the first point at which the old paths fall out of
+use. The migration header lists the contract steps so they cannot be forgotten:
+
+- `NOT NULL` on `invoices.office_id`, `clients/items/banks/presets.business_id` and the new
+  `invoice_sequences` key
+- the `invoices (clientId, businessId) -> clients (id, business_id)` composite FK (C3)
+- drop `invoices.taxName/taxRate/taxType`, `invoice_items.taxRate/taxType`, `items.taxRate/taxType`
+- drop the old `invoice_sequences` `businessId`/`clientId` columns and their unique key
+- drop `settings.invoicePrefix`/`invoiceSuffix`
+- RLS on `invoices`, its child tables, `clients`, `items`, `banks`, `presets`, `invoice_sequences`
+
+Two findings that forced the split, both caught by the tests rather than assumed:
+
+- **The customer composite FK cannot go on yet.** `invoices."clientId"` and `"businessId"` are both
+  already `NOT NULL`, so `(clientId, businessId) -> clients (id, business_id)` is enforced the
+  moment it exists - and every existing customer has a NULL `business_id`. It broke all 18 invoice
+  service tests. `(office_id, "businessId")` and `(original_invoice_id, office_id)` are fine, since
+  `office_id` is still NULL and a composite FK with a NULL column is not enforced under MATCH
+  SIMPLE. The unique indexes the deferred FK needs are created here, so the contract step is one
+  `ALTER TABLE`.
+- **RLS on existing tables has to wait too.** An office- or company-scoped policy with a NULL scope
+  column denies everything, so turning it on now would stop the API creating invoices and
+  customers at all. Only the tables this migration creates get policies: `office_bank_accounts`
+  and `invoice_office_snapshots`, the latter through a new `app_invoice_visible()` definer function
+  that reaches the parent invoice's office - the pattern every invoice child table will use.
+
+Other decisions:
+
+- **`country_code` is not added twice.** `clients` already carries `"countryCode"` for Peppol and
+  the client snapshot carries `"clientCountryCode"`; that is the same fact GST needs for a foreign
+  place of supply. Both are reused, with `'IN'` defaulted on `clients`, rather than adding a second
+  column that means the same thing. Only `gstin`, `state_code` and `is_sez` are new.
+- **`gst_rates` carries no RLS**, like `currencies` and `units`: it is a global reference table and
+  the `admin.settings` permission on the route is what gates writing to it. Seeded 0, 0.25, 1.5, 3,
+  5, 18 and 40 per the plan (binding condition 8: `NUMERIC`, admin-editable).
+- **`"issuedAt"` becomes `date`** - a business date on the IST calendar - while the new `issued_at`
+  is the `timestamptz` recording when the issue happened. Both exist, per design 7.2.
+- **CHECK constraints carry the lifecycle rules** so they hold whatever the service does: an issued
+  invoice has a number, only a cancelled one has cancellation details, `invoiceType` of
+  `credit_note` holds exactly when `original_invoice_id` is set, the supply type is one of the six
+  the tax module knows, the place of supply is two digits and any exchange rate is positive.
+- **Numbering** is a partial unique on `(office_id, "invoiceType", "invoiceNumber")` where the
+  number is not null, so unnumbered drafts never collide. The legacy
+  `(businessId, invoiceFullNumber, clientId, invoiceType)` key is dropped here, since no code names
+  it and it would block per-office series.
+- **Tests:** new `invoiceScoping.schema.spec.ts`, 19 cases plus 1 todo for the deferred FK, over
+  the seed, the composite FKs, the lifecycle checks, nullable draft numbers, the date type, the
+  series uniqueness and the RLS on the new tables, including a cross-office denial as `app_user`.
+  `baseline.schema.spec.ts` gains the new columns under `LATER_ADDITIONS` (`INTENTIONAL_DROPS`
+  stays empty: nothing is dropped yet). `access.rls.spec.ts` enumerates every RLS-enabled table
+  and every `app_*`/`auth_*` function, so both of its structure assertions were updated - the
+  function count guard correctly caught `app_invoice_visible` arriving.
+- **Check:** prettier, lint and typecheck clean. 18 test files pass, 196 passed and 4 todo. The
+  remaining 5 files could not run: Windows Application Control is blocking
+  `node_modules/argon2/prebuilds/win32-x64/argon2.glibc.node` after an OS update during this
+  session, so every file that transitively imports argon2 fails to load. It is unrelated to this
+  migration - `routes.permissions.spec.ts` opens no database - and needs the policy to allow that
+  file, or argon2 reinstalled, on the host.

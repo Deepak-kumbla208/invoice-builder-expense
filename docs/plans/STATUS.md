@@ -26,7 +26,7 @@
 ## Current
 
 - **Active phase:** 2 (branch `phase-2-invoices`)
-- **Next task:** 2.3 (migration `0004-invoice-scoping.sql`), per `docs/plans/phase-2-invoices.md`
+- **Next task:** 2.4 (invoice service + the contract migration), per `docs/plans/phase-2-invoices.md`
 - **Blockers:** none (note: host port 5432 is held by an unrelated `i-ticket-postgres-1` container, so the dev database is unreachable until that port is freed or remapped; a data volume created before 1.1 has no `app_owner`/`app_user` until it is recreated, see `phase-1-notes.md`)
 
 ### Phase 1 gate (2026-09-23)
@@ -61,6 +61,13 @@ New feature tests and RLS/IDOR/permission tests do not apply to Phase 0.
 ## Session log
 
 <!-- newest first, ≤10 lines per session: date · tasks done · checks run/results · next · blockers -->
+
+- 2026-10-09 - 2.3 done as `0006-invoice-scoping.sql` (the plan's `0004` name collided with Phase 1): `gst_rates` seeded with the 7 slabs, company scoping on clients/items/banks/presets, new `office_bank_accounts` and `invoice_office_snapshots`, 20 new `invoices` columns with 8 lifecycle CHECKs, `invoiceNumber` nullable, `"issuedAt"` to `date`, `credit_note` type, per-office partial unique replacing the legacy key, GST columns on `invoice_items`, INR + reference on payments, and the office/type/FY series key
+- 2.3 **structural call: this is the expand half of expand/contract.** The plan's drops, `NOT NULL`s and RLS on existing tables cannot land until the services populate the scope columns in 2.4; doing them now breaks the service, the suite and the app. The contract list is in the migration header and `phase-2-notes.md`
+- 2.3 two findings that forced it, both caught by tests: the `(clientId, businessId)` composite FK is enforced immediately (both columns already `NOT NULL`) and broke all 18 invoice service tests against customers with a NULL `business_id`; and an office-scoped RLS policy with a NULL `office_id` denies everything, so the API could not create invoices at all. `(office_id, businessId)` is fine - MATCH SIMPLE skips a NULL
+- 2.3 also: `country_code` reuses the existing `"countryCode"`/`"clientCountryCode"` instead of a duplicate column; the new `app_invoice_visible()` definer is the pattern every invoice child table will use for RLS
+- 2.3 check: prettier/lint/typecheck clean; 18 test files 196 passed + 4 todo
+- **BLOCKER (host, not code):** Windows Application Control is blocking `node_modules/argon2/prebuilds/win32-x64/argon2.glibc.node` after an OS update mid-session, so the 5 test files that import argon2 cannot load (`adminCli`, `admin.api`, `auth.api`, `permissions.matrix`, `routes.permissions`). Needs the policy to allow that file or argon2 reinstalled. Unrelated to 2.3 - `routes.permissions.spec` opens no database. Not committed
 
 - 2026-09-23 · 2.2 done: `shared/tax/` (`money`, `types`, `supplyType`, `financialYear`, `computeInvoice`, barrel) — integer paisa, half-up away from zero, rates as basis points, all six supply types, inclusive/exclusive pricing, HSN summary, FY and `formatDocNumber` with the 16-character D20 assertion. 35 unit cases
 - 2.2 deviation: `@tax` is added to `tsconfig.app.json` and `vite.config.ts` but **not** `tsconfig.webserver.json` — `tsc` does not rewrite aliases on emit, so a `paths` entry there would typecheck and then fail at runtime in `dist-be`. Same convention as the existing `@shared`; backend code imports `../tax`

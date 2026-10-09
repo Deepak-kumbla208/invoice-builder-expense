@@ -30,6 +30,10 @@ type Seed = Record<
   number
 >;
 
+// 0006-invoice-scoping.sql secures the tables it creates; the rest of the invoice tables get
+// their policies in the contract step, once the services populate their scope columns.
+const SCOPED_TABLES_0006 = ['office_bank_accounts', 'invoice_office_snapshots'];
+
 const RLS_DENIED = { code: '42501' };
 
 describe('RLS on access tables (0004)', () => {
@@ -117,7 +121,7 @@ describe('RLS on access tables (0004)', () => {
            ORDER BY relname`
         )
       );
-      expect(rows.map(row => row.relname)).toEqual([...RLS_TABLES].sort());
+      expect(rows.map(row => row.relname)).toEqual([...RLS_TABLES, ...SCOPED_TABLES_0006].sort());
       expect(rows.every(row => row.relforcerowsecurity)).toBe(true);
     });
 
@@ -157,7 +161,8 @@ describe('RLS on access tables (0004)', () => {
            WHERE pronamespace = 'public'::regnamespace AND (proname LIKE 'app\\_%' OR proname LIKE 'auth\\_%')`
         )
       );
-      expect(rows.length).toBe(16);
+      // 16 from 0004, plus app_invoice_visible from 0006.
+      expect(rows.length).toBe(17);
       for (const row of rows) {
         expect(row, row.proname).toMatchObject({
           owner: 'app_owner',

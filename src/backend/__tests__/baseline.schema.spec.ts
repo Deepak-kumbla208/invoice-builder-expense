@@ -5,7 +5,38 @@ import { createPgTestDb, type PgTestDb } from './helpers/pgTestDb';
 
 const INTENTIONAL_DROPS: Record<string, string[]> = {};
 const LATER_ADDITIONS: Record<string, string[]> = {
-  businesses: ['legal_name', 'pan', 'default_layout_id', 'default_style_profile_id']
+  businesses: ['legal_name', 'pan', 'default_layout_id', 'default_style_profile_id'],
+  // 0006-invoice-scoping.sql
+  clients: ['business_id', 'gstin', 'state_code', 'is_sez', 'uuid'],
+  items: ['business_id', 'hsn_sac', 'gst_rate'],
+  banks: ['business_id'],
+  presets: ['business_id'],
+  invoice_client_snapshots: ['gstin', 'state_code', 'is_sez'],
+  invoice_items: ['hsn_sac', 'gst_rate', 'cgst_cents', 'sgst_cents', 'igst_cents'],
+  invoice_payments: ['amount_inr_cents', 'reference'],
+  invoice_sequences: ['office_id', 'invoice_type', 'financial_year', 'next_sequence'],
+  invoices: [
+    'office_id',
+    'created_by',
+    'uuid',
+    'document_status',
+    'original_invoice_id',
+    'supply_type',
+    'place_of_supply_state_code',
+    'prices_include_tax',
+    'exchange_rate_to_inr',
+    'exchange_rate_source',
+    'exchange_rate_date',
+    'subtotal_cents',
+    'tax_cents',
+    'total_cents',
+    'total_inr_cents',
+    'issued_by',
+    'issued_at',
+    'cancelled_by',
+    'cancelled_at',
+    'cancel_reason'
+  ]
 };
 
 describe('baseline schema', () => {
