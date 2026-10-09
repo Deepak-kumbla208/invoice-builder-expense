@@ -26,7 +26,7 @@
 ## Current
 
 - **Active phase:** 2 (branch `phase-2-invoices`)
-- **Next task:** 2.2 (shared tax module), per `docs/plans/phase-2-invoices.md`
+- **Next task:** 2.3 (migration `0004-invoice-scoping.sql`), per `docs/plans/phase-2-invoices.md`
 - **Blockers:** none (note: host port 5432 is held by an unrelated `i-ticket-postgres-1` container, so the dev database is unreachable until that port is freed or remapped; a data volume created before 1.1 has no `app_owner`/`app_user` until it is recreated, see `phase-1-notes.md`)
 
 ### Phase 1 gate (2026-09-23)
@@ -61,6 +61,12 @@ New feature tests and RLS/IDOR/permission tests do not apply to Phase 0.
 ## Session log
 
 <!-- newest first, ≤10 lines per session: date · tasks done · checks run/results · next · blockers -->
+
+- 2026-09-23 · 2.2 done: `shared/tax/` (`money`, `types`, `supplyType`, `financialYear`, `computeInvoice`, barrel) — integer paisa, half-up away from zero, rates as basis points, all six supply types, inclusive/exclusive pricing, HSN summary, FY and `formatDocNumber` with the 16-character D20 assertion. 35 unit cases
+- 2.2 deviation: `@tax` is added to `tsconfig.app.json` and `vite.config.ts` but **not** `tsconfig.webserver.json` — `tsc` does not rewrite aliases on emit, so a `paths` entry there would typecheck and then fail at runtime in `dist-be`. Same convention as the existing `@shared`; backend code imports `../tax`
+- 2.2 deliberate differences from the legacy maths, all tested: the discount is split with a largest-remainder allocation so line shares add up exactly (legacy lost the residual), the discount is capped at the subtotal (legacy went negative), and the discount is rounded rather than the total, so the printed figures reconcile — the one case that can differ by a paisa. CGST/SGST halve the rate, not the tax
+- 2.2 the plan's "characterisation tests must still pass with the same results in paisa" is discharged by `renderer/__tests__/taxParity.test.ts`, which runs both implementations over the same inputs and compares, rather than by assertion. It also proves the alias resolves
+- 2.2 check: prettier/lint/typecheck clean, `npm test` 25 files 242 passed + 3 todo, `npm run build` green. Next: 2.3. Not committed
 
 - 2026-09-23 · 2.1 done: characterisation tests before touching anything. The invoice maths the plan names for 2.2 is **not** in the service — the server stores what the browser computes — so the maths is pinned where it actually lives, in a new `renderer/__tests__/invoiceFunctions.test.ts` (24 cases), which is the code 2.2 ports to `shared/tax/`
 - 2.1 pinned in `services/__tests__/invoices.spec.ts` (new `invoice persistence` block, 7 cases): discount/surcharge/shipping stored verbatim, line items with their snapshot, partial payments as separate rows with the status left to the caller, `paidAt`/`closedAt` per status on add and update, the three browser-built snapshots, and duplicate content (notes, items and shipping copied; payments deliberately not)

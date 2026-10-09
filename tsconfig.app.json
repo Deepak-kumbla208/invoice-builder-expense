@@ -16,7 +16,8 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "paths": {
-      "@shared/*": ["./src/backend/shared/*"]
+      "@shared/*": ["./src/backend/shared/*"],
+      "@tax": ["./src/backend/shared/tax/index.ts"]
     },
 
     /* Linting */
